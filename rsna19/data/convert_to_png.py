@@ -12,7 +12,7 @@ from rsna19.data.utils import load_labels
 from rsna19.preprocessing.pydicom_loader import PydicomLoader
 
 STEP = 25
-PATH = "/kolos/m2/ct/data/rsna/train/*/dicom/*"
+PATH = "/kolos/m2/ct/data/rsna/*/*/dicom/*"
 CLASSES = {
     "epidural":         (255, 237, 0),
     "intraparenchymal": (212, 36, 0),
@@ -47,6 +47,10 @@ def draw_labels(path):
         os.makedirs(os.path.dirname(dst_path), exist_ok=True)
         os.makedirs(os.path.dirname(dst_storage_path), exist_ok=True)
 
+        # if any(labels.loc[scan_id]):
+        #     cv2.imshow('img', img)
+        #     cv2.waitKey()
+        #
         cv2.imwrite(dst_storage_path, img)
 
         if os.path.exists(dst_path):
@@ -55,10 +59,6 @@ def draw_labels(path):
         os.symlink(dst_storage_path, dst_path)
     except:
         traceback.print_exc()
-
-    # if any(labels.loc[scan_id]):
-    #     cv2.imshow('img', img)
-    #     cv2.waitKey()
 
 
 def main():

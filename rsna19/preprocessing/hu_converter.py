@@ -1,14 +1,15 @@
-import json
 import numpy as np
 from scipy.interpolate import interp1d
-
-from ct.preprocessing.configs import configs
 
 
 class HuConverter:
     """Class for converting HU units to 8 bits or number of bits specified in cdf"""
-    cdf = np.load(configs.std3d.meta_directory + "/cdf.npy")
-    window = (configs.std3d.min_hu_value, configs.std3d.max_hu_value)
+    meta_directory = '/kolos/m2/ct/data/meta/std2d'
+    min_hu_value = -400
+    max_hu_value = 2000
+
+    cdf = np.load(meta_directory + "/cdf.npy")
+    window = (min_hu_value, max_hu_value)
 
     @classmethod
     def change_convert_params(cls, cdf, window):
