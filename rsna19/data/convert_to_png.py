@@ -33,13 +33,15 @@ def draw_labels(path):
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
 
         counter = 0
-        for c in CLASSES.keys():
-            if labels.loc[scan_id][c]:
-                cv2.circle(img, (STEP, STEP // 2 + counter * STEP),
-                           STEP // 2, CLASSES[c], -1)
-                cv2.putText(img, c, (2 * STEP, STEP // 2 + counter * STEP),
-                            cv2.FONT_HERSHEY_SIMPLEX, .5, CLASSES[c])
-                counter += 1
+
+        if 'train' in path:
+            for c in CLASSES.keys():
+                if labels.loc[scan_id][c]:
+                    cv2.circle(img, (STEP, STEP // 2 + counter * STEP),
+                               STEP // 2, CLASSES[c], -1)
+                    cv2.putText(img, c, (2 * STEP, STEP // 2 + counter * STEP),
+                                cv2.FONT_HERSHEY_SIMPLEX, .5, CLASSES[c])
+                    counter += 1
 
         dst_path = path.replace("dicom", "vis").replace('.dcm', '.png')
         dst_storage_path = dst_path.replace('m2', 'storage')
