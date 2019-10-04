@@ -8,7 +8,7 @@ class HuConverter:
     min_hu_value = -400
     max_hu_value = 2000
 
-    cdf = np.load(meta_directory + "/cdf.npy")
+    cdf = np.load("cdf.npy")
     window = (min_hu_value, max_hu_value)
 
     @classmethod
