@@ -12,12 +12,13 @@ import numpy as np
 import pandas
 from tqdm import tqdm
 
+from rsna19.config import config
+
 # path under which new directory structure will be created
-ROOT_PATH = '/kolos/m2/ct/data/rsna/'
-DF_PATH_IN = ROOT_PATH + 'df.pkl'
+DF_PATH_IN = os.path.join(config.data_root, 'df.pkl')
 
 # dataframe mapping SOPInstanceUID of each dicom to path in new directory structure
-ID_DF_PATH_OUT = ROOT_PATH + 'id_to_path.pkl'
+ID_DF_PATH_OUT = os.path.join(config.data_root, 'id_to_path.pkl')
 
 
 def main():
@@ -31,7 +32,7 @@ def main():
                 'StudyInstanceUID')):
 
         subset = dicoms_df.iloc[0].subset
-        study_dir = os.path.join(ROOT_PATH, subset, study_id, 'dicom')
+        study_dir = os.path.join(config.data_root, subset, study_id, 'dicom')
         os.makedirs(study_dir)
 
         # sort by z value

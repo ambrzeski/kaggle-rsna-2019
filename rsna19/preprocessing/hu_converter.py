@@ -5,7 +5,6 @@ from scipy.interpolate import interp1d
 
 class HuConverter:
     """Class for converting HU units to 8 bits or number of bits specified in cdf"""
-    meta_directory = '/kolos/m2/ct/data/meta/std2d'
     min_hu_value = -400
     max_hu_value = 2000
 
