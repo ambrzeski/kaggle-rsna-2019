@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy.interpolate import interp1d
 
@@ -8,7 +9,7 @@ class HuConverter:
     min_hu_value = -400
     max_hu_value = 2000
 
-    cdf = np.load("cdf.npy")
+    cdf = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cdf.npy"))
     window = (min_hu_value, max_hu_value)
 
     @classmethod
