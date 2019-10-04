@@ -1,3 +1,9 @@
+""" Convert dataset from dcm format to:
+    - Label visualization in png format     ("vis/" directory)
+    - npy arrays for training
+
+"""
+
 import glob
 import os
 import traceback
@@ -11,7 +17,7 @@ import tqdm
 from rsna19.data.utils import load_labels
 from rsna19.preprocessing.pydicom_loader import PydicomLoader
 
-WORKERS = 40
+WORKERS = 12
 STEP = 25
 PATH = "/kolos/m2/ct/data/rsna/*/*/dicom/*"
 CLASSES = {
@@ -55,6 +61,10 @@ def draw_labels(path, img):
                             cv2.FONT_HERSHEY_SIMPLEX, .5, CLASSES[c])
                 counter += 1
 
+    # if any(labels.loc[scan_id]):
+    #     cv2.imshow('img', img)
+    #     cv2.waitKey()
+
 
 def save_image(path, img, img_orig_hu):
     dst_path = path.replace("dicom", "vis").replace('.dcm', '.png')
@@ -64,27 +74,19 @@ def save_image(path, img, img_orig_hu):
     if is_brainscan_server:
         dst_link = dst_path
         dst_path = dst_link.replace('m2', 'storage')
+        os.makedirs(os.path.dirname(dst_link), exist_ok=True)
 
-        dst_link_orig_hu = dst_path_orig_hu
-        dst_path_orig_hu = dst_link_orig_hu.replace('m2', 'ssd')
-
-        for path in [dst_link, dst_path, dst_link_orig_hu, dst_path_orig_hu]:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+    for path in [dst_path,  dst_path_orig_hu]:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
 
     cv2.imwrite(dst_path, img)
     np.save(dst_path_orig_hu, img_orig_hu)
 
     if is_brainscan_server:
-        for path in [dst_link, dst_link_orig_hu]:
-            if os.path.exists(path):
-                os.remove(path)
+        if os.path.exists(path):
+            os.remove(path)
 
-        os.symlink(dst_path_orig_hu, dst_link_orig_hu)
         os.symlink(dst_path, dst_link)
-
-    # if any(labels.loc[scan_id]):
-    #     cv2.imshow('img', img)
-    #     cv2.waitKey()
 
 
 def main():
