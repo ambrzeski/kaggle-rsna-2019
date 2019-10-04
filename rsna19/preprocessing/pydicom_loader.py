@@ -25,11 +25,13 @@ class PydicomLoader:
 
         return [self.get_first_of_dicom_field_as_int(x) for x in dicom_fields]
 
-    def load(self, path):
+    def load(self, path, convert_hu=True):
         data = pydicom.read_file(path)
         image = data.pixel_array
         window_center, window_width, intercept, slope = self.get_windowing(data)
         image = self.window_image(image, intercept, slope)
-        image = self.hu_converter.convert(image)
+
+        if convert_hu:
+            image = self.hu_converter.convert(image)
 
         return image
