@@ -1,7 +1,8 @@
-""" Convert dataset from dcm format to:
-    - Label visualization in png format     ("vis/" directory)
-    - npy arrays for training
-
+""" Convert the data set from .dcm format to the following directories:
+    * "vis/" - Label visualization in .png format.
+    * "npy/" - Original pixel array transformed using RescaleSlope and RescaleIntercept
+                parameters, without windowing, stored in .npy format. The most efficient
+                way to load data during training.
 """
 
 import glob
@@ -82,6 +83,7 @@ def save_image(path, img, img_orig_hu):
     cv2.imwrite(dst_path, img)
     np.save(dst_path_orig_hu, img_orig_hu)
 
+    # Store data visualisation files on a slower disk array
     if is_brainscan_server:
         if os.path.exists(path):
             os.remove(path)
