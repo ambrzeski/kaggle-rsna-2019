@@ -15,9 +15,15 @@ def load_dicom_tags():
 
 def load_labels():
     labels = pd.read_csv(config.labels_path)
-    labels[['ID', 'Disease']] = labels.ID.str.rsplit("_", 1, expand=True)
-    labels = labels[['ID', 'Disease', 'Label']]
-    labels = pd.pivot_table(labels, index="ID", columns="Disease", values="Label")
+    labels[['SOPInstanceUID', 'Disease']] = labels.ID.str.rsplit("_", 1, expand=True)
+    labels = labels[['SOPInstanceUID', 'Disease', 'Label']]
+    labels = pd.pivot_table(labels, index="SOPInstanceUID", columns="Disease", values="Label")
 
     return labels
 
+
+def load_df_with_labels_and_dicom_tags():
+    tags = load_dicom_tags()
+    labels = load_labels()
+
+    return labels.merge(tags, on='SOPInstanceUID', how='outer')
