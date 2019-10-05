@@ -40,4 +40,12 @@ $ python rsna19/data/scripts/create_symlinks.py
 $ python rsna19/data/scripts/convert_dataset.py
 ```
 
-Now you can safely use project's pytorch data loader class for your training (rsna19.data.dataset.IntracranialDataset). 
+Now you can safely use project's pytorch data loader class for your training. For example, if you want to read the data for 2D classification, using four of the first folds for training and the last one for validation, you can do:
+
+```
+train_data = IntracranialDataset('5fold.csv', folds=[0, 1, 2, 3], return_labels=True)
+val_data = IntracranialDataset('5fold.csv', folds=[4], return_labels=True)
+```
+
+5fold.csv is a dataset file including all the training data split into 5 folds. The file is located in rsna19/datasets.
+
