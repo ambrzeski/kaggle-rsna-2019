@@ -62,6 +62,8 @@ def main():
 
     df = pandas.DataFrame(d)
 
+    # Save the data frame
+    os.makedirs(os.path.dirname(DF_PATH_OUT), exist_ok=True)
     with open(DF_PATH_OUT, 'wb') as f:
         pickle.dump(df, f)
 
