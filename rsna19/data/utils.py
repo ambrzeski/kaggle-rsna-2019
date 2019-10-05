@@ -1,10 +1,9 @@
 import pickle
 import pandas as pd
 
-# DICOM_TAGS_DF_PATH = '/kolos/m2/ct/data/rsna/df.pkl'
-# LABELS_PATH = '/kolos/storage/ct/data/rsna/stage_1_train.csv'
-DICOM_TAGS_DF_PATH = '/home/tomek/data/df.pkl'
-LABELS_PATH = '/home/tomek/data/stage_1_train.csv'
+from rsna19.config import config
+
+DICOM_TAGS_DF_PATH = '/kolos/m2/ct/data/rsna/df.pkl'
 
 
 def load_dicom_tags():
@@ -15,7 +14,7 @@ def load_dicom_tags():
 
 
 def load_labels():
-    labels = pd.read_csv(LABELS_PATH)
+    labels = pd.read_csv(config.labels_path)
     labels[['SOPInstanceUID', 'Disease']] = labels.ID.str.rsplit("_", 1, expand=True)
     labels = labels[['SOPInstanceUID', 'Disease', 'Label']]
     labels = pd.pivot_table(labels, index="SOPInstanceUID", columns="Disease", values="Label")
