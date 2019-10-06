@@ -15,13 +15,13 @@ import numpy as np
 import pydicom
 import tqdm
 
-from rsna19.config import config
+from rsna19.configs.base_config import BaseConfig
 from rsna19.data.utils import load_labels
 from rsna19.preprocessing.pydicom_loader import PydicomLoader
 
 WORKERS = 12
 STEP = 25
-PATH = os.path.join(config.data_root, "*/*/dicom/*")
+PATH = os.path.join(BaseConfig.data_root, "*/*/dicom/*")
 CLASSES = {
     "epidural":         (255, 237, 0),
     "intraparenchymal": (212, 36, 0),

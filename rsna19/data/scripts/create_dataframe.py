@@ -10,10 +10,10 @@ import pandas
 import pydicom
 from tqdm import tqdm
 
-from rsna19.config import config
+from rsna19.configs.base_config import BaseConfig
 
 # path under which new directory structure will be created
-DF_PATH_OUT = os.path.join(config.data_root, 'df.pkl')
+DF_PATH_OUT = os.path.join(BaseConfig.data_root, 'df.pkl')
 
 
 def read_dicom(path):
@@ -44,7 +44,7 @@ def main():
             'RescaleSlope']
 
     d = defaultdict(list)
-    for subset, subset_dir in [('train', config.train_dir), ('test', config.test_dir)]:
+    for subset, subset_dir in [('train', BaseConfig.train_dir), ('test', BaseConfig.test_dir)]:
         for root, dirs, files in os.walk(subset_dir):
             for file in tqdm(files):
                 try:

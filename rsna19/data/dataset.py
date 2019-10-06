@@ -1,14 +1,18 @@
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from rsna19.config import config
+from rsna19.configs.base_config import BaseConfig
 
 
 class IntracranialDataset(Dataset):
+    # _NUM_SLICES must be odd
+    _NUM_SLICES = 3  # TODO get this from config maybe
+    _SLICE_SIZE = 512
 
     def __init__(self, csv_file, folds, csv_root_dir=None, return_labels=True, preprocess_func=None):
         """
@@ -35,8 +39,15 @@ class IntracranialDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        img_path = os.path.normpath(os.path.join(config.data_root, '..', self.data.loc[idx, 'path']))
-        img = np.load(img_path)
+        middle_img_path = Path(os.path.normpath(os.path.join(BaseConfig.data_root, '..', self.data.loc[idx, 'path'])))
+        middle_img_num = int(middle_img_path.stem)
+        slices_image = np.zeros((self._NUM_SLICES, self._SLICE_SIZE, self._SLICE_SIZE))
+        for idx, img_num in enumerate(range(middle_img_num - self._NUM_SLICES//2, middle_img_num - self._NUM_SLICES//2)):
+            # [:512, :512] temporary workaround for bigger images
+            print(middle_img_path.parent.joinpath('{}.npy'.format(img_num)))
+            slices_image[idx] = np.load(middle_img_path.parent.joinpath('{}.npy'.format(img_num)))[:512, :512]
+
+        img = torch.tensor(slices_image, dtype=torch.float32)
 
         if self.preprocess_func:
             img = self.preprocess_func(img)
@@ -47,7 +58,7 @@ class IntracranialDataset(Dataset):
                                                       'intraventricular',
                                                       'subarachnoid',
                                                       'subdural',
-                                                      'any']])
+                                                      'any']], dtype=torch.float32)
             return {'image': img, 'labels': labels}
 
         else:
