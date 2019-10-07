@@ -42,10 +42,15 @@ class IntracranialDataset(Dataset):
         middle_img_path = Path(os.path.normpath(os.path.join(BaseConfig.data_root, '..', self.data.loc[idx, 'path'])))
         middle_img_num = int(middle_img_path.stem)
         slices_image = np.zeros((self._NUM_SLICES, self._SLICE_SIZE, self._SLICE_SIZE))
-        for idx, img_num in enumerate(range(middle_img_num - self._NUM_SLICES//2, middle_img_num - self._NUM_SLICES//2)):
+        for idx, img_num in enumerate(range(middle_img_num - self._NUM_SLICES//2,
+                                            middle_img_num + self._NUM_SLICES//2 + 1)):
+            if img_num < 0:
+                img_num = 0
+            if img_num > (len(os.listdir(middle_img_path.parent)) - 1):
+                img_num = len(os.listdir(middle_img_path.parent)) - 1
+
             # [:512, :512] temporary workaround for bigger images
-            print(middle_img_path.parent.joinpath('{}.npy'.format(img_num)))
-            slices_image[idx] = np.load(middle_img_path.parent.joinpath('{}.npy'.format(img_num)))[:512, :512]
+            slices_image[idx] = np.load(middle_img_path.parent.joinpath('{:03d}.npy'.format(img_num)))[:512, :512]
 
         img = torch.tensor(slices_image, dtype=torch.float32)
 
