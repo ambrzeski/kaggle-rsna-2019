@@ -1,3 +1,5 @@
+import json
+
 import os
 
 from pytorch_lightning import Trainer
@@ -13,6 +15,10 @@ def main():
     model = Classifier2DC(config)
 
     exp = Experiment(config.train_out_dir)
+
+    with open(os.path.join(exp.log_dir, '../config.json'), 'w') as f:
+        config_dict = {k: getattr(Config, k) for k in dir(Config) if not k.startswith('__')}
+        json.dump(config_dict, f, indent=2)
 
     checkpoint_callback = ModelCheckpoint(
         filepath=os.path.join(config.train_out_dir, "models"),

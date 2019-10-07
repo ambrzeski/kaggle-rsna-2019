@@ -7,4 +7,3 @@ class BaseConfig:
 
     n_classes = 6
     csv_root_dir = None
-
