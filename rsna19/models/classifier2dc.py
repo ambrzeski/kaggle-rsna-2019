@@ -71,14 +71,14 @@ class Classifier2DC(pl.LightningModule):
 
     @pl.data_loader
     def train_dataloader(self):
-        return DataLoader(IntracranialDataset('5fold.csv', self.train_folds),
+        return DataLoader(IntracranialDataset(self.config, self.train_folds),
                           shuffle=True,
                           num_workers=self.config.num_workers,
                           batch_size=self.config.batch_size)
 
     @pl.data_loader
     def val_dataloader(self):
-        return DataLoader(IntracranialDataset('5fold.csv', self.val_folds),
+        return DataLoader(IntracranialDataset(self.config, self.val_folds),
                           num_workers=self.config.num_workers,
                           batch_size=self.config.batch_size)
 

@@ -19,3 +19,6 @@ class Config(BaseConfig):
 
     max_epoch = 20
 
+    min_hu_value = -1000
+    max_hu_value = 1000
+

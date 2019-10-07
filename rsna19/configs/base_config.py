@@ -6,5 +6,5 @@ class BaseConfig:
     data_root = "/kolos/m2/ct/data/rsna/"
 
     n_classes = 6
-
+    csv_root_dir = None
 

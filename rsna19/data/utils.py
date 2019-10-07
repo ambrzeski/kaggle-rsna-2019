@@ -27,3 +27,12 @@ def load_df_with_labels_and_dicom_tags():
     labels = load_labels()
 
     return labels.merge(tags, on='SOPInstanceUID', how='outer')
+
+
+def normalize_train(image, min_hu_value=-1000, max_hu_value=1000):
+    """normalize hu values to -1 to 1 range"""
+    image[image < min_hu_value] = min_hu_value
+    image[image > max_hu_value] = max_hu_value
+    image = (image - min_hu_value)/((max_hu_value - min_hu_value)/2) - 1
+    return image
+
