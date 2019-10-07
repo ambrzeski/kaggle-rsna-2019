@@ -12,13 +12,14 @@ class Config(BaseConfig):
     pretrained = True
 
     lr = 0.0001
-    batch_size = 64   # 16 (3, 512, 512) images fits on TITAN XP
+    batch_size = 64  # 16 (3, 512, 512) images fits on TITAN XP
 
     gpus = [0, 1, 2, 3]
     num_workers = 3 * len(gpus)
 
     max_epoch = 20
 
+    num_slices = 3  # must be odd
+    slice_size = 256
     min_hu_value = -1000
     max_hu_value = 1000
-

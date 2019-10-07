@@ -10,10 +10,6 @@ from rsna19.data.utils import normalize_train
 
 
 class IntracranialDataset(Dataset):
-    # _NUM_SLICES must be odd
-    _NUM_SLICES = 3  # TODO get this from config maybe
-    _SLICE_SIZE = 512
-
     def __init__(self, config, folds, return_labels=True):
         """
         :param csv_file: path to csv file
@@ -39,19 +35,29 @@ class IntracranialDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        path = os.path.normpath(os.path.join(self.config.data_root, '..', self.data.loc[idx, 'path']))
 
-        middle_img_path = Path(os.path.normpath(os.path.join(self.config.data_root, '..', self.data.loc[idx, 'path'])))
+        # todo it would be better to have generic paths in csv and parameter specifying which data version to use
+        if self.config.slice_size == 256:
+            path = path.replace('npy/', 'npy256/')
+
+        middle_img_path = Path(path)
+
         middle_img_num = int(middle_img_path.stem)
-        slices_image = np.zeros((self._NUM_SLICES, self._SLICE_SIZE, self._SLICE_SIZE))
-        for idx, img_num in enumerate(range(middle_img_num - self._NUM_SLICES//2,
-                                            middle_img_num + self._NUM_SLICES//2 + 1)):
+        slices_image = np.zeros((self.config.num_slices, self.config.slice_size, self.config.slice_size))
+        for idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
+                                            middle_img_num + self.config.num_slices // 2 + 1)):
             if img_num < 0:
                 img_num = 0
             if img_num > (len(os.listdir(middle_img_path.parent)) - 1):
                 img_num = len(os.listdir(middle_img_path.parent)) - 1
 
-            # [:512, :512] temporary workaround for bigger images
-            slices_image[idx] = np.load(middle_img_path.parent.joinpath('{:03d}.npy'.format(img_num)))[:512, :512]
+            slice_img = np.load(middle_img_path.parent.joinpath('{:03d}.npy'.format(img_num)))
+
+            # temporary workaround for bigger images
+            if slice_img.shape != (self.config.slice_size, self.config.slice_size):
+                slice_img = slice_img[:self.config.slice_size, :self.config.slice_size]
+            slices_image[idx] = slice_img
 
         if normalize_train:
             slices_image = normalize_train(slices_image,
