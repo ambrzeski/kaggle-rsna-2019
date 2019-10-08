@@ -34,7 +34,7 @@ class HuConverter:
         :param slice_pixels: nD numpy array with a single slice
         :return: converted nD numpy array
         """
-        slice_pixels_copy = slice_pixels.copy()
+        slice_pixels_copy = slice_pixels.copy().astype(np.int32)
         slice_pixels_copy[slice_pixels_copy < min_hu_value] = min_hu_value
         slice_pixels_copy[slice_pixels_copy > max_hu_value] = max_hu_value
         slice_pixels_copy -= min_hu_value
