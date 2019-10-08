@@ -5,12 +5,16 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+import numpy as np
 
 from rsna19.data.dataset import IntracranialDataset
+import rsna19.models.metrics as metrics
 
 
 class Classifier2DC(pl.LightningModule):
     _NUM_FEATURES_BACKBONE = 2048
+    # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any'
+    _CLASS_WEIGHTS = [1, 1, 1, 1, 1, 2]
 
     @staticmethod
     def get_base_model(model, pretrained):
@@ -55,16 +59,42 @@ class Classifier2DC(pl.LightningModule):
     def training_step(self, batch, batch_nb):
         x, y = batch['image'], batch['labels']
         y_hat = self.forward(x)
-        return {'loss': F.binary_cross_entropy_with_logits(y_hat, y)}
+        class_weights = torch.tensor(self._CLASS_WEIGHTS, dtype=torch.float32).to(y_hat.get_device())
+        return {'loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights)}
 
     def validation_step(self, batch, batch_nb):
         x, y = batch['image'], batch['labels']
         y_hat = self.forward(x)
-        return {'val_loss': F.binary_cross_entropy_with_logits(y_hat, y)}
+        class_weights = torch.tensor(self._CLASS_WEIGHTS, dtype=torch.float32).to(y_hat.get_device())
+        return {'val_loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights).cpu().numpy(),
+                'y_hat_np': torch.sigmoid(y_hat).cpu().numpy(),
+                'y_np': y.cpu().numpy()}
 
     def validation_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        return {'avg_val_loss': avg_loss}
+        out_dict = {}
+
+        y_hat = np.concatenate([x['y_hat_np'] for x in outputs])
+        y = np.concatenate([x['y_np'] for x in outputs])
+
+        th = 0.5
+        accuracy = metrics.accuracy(y_hat, y, th, True)
+        f1_score = metrics.f1score(y_hat, y, th, True)
+        specificity = metrics.specificity(y_hat, y, th, True)
+        sensitivity = metrics.sensitivity(y_hat, y, th, True)
+        roc_auc = metrics.roc_auc(y_hat, y)
+
+        classes = ['epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any']
+        for acc, f1, spec, sens, roc, class_name in zip(accuracy, f1_score, specificity, sensitivity, roc_auc, classes):
+            out_dict['{}_acc'.format(class_name)] = acc
+            out_dict['{}_f1'.format(class_name)] = f1
+            out_dict['{}_spec'.format(class_name)] = spec
+            out_dict['{}_sens'.format(class_name)] = sens
+            out_dict['{}_roc'.format(class_name)] = roc
+
+        avg_loss = np.stack([x['val_loss'] for x in outputs]).mean()
+        out_dict['avg_val_loss'] = avg_loss
+
+        return out_dict
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.config.lr)
