@@ -69,7 +69,7 @@ def draw_labels(path, img):
 
 
 def save_image(path, img, img_orig_hu):
-    dst_path = path.replace("dicom", "vis").replace('.dcm', '.png')
+    dst_path = path.replace("dicom", "vis").replace('.dcm', '.jpg')
     dst_path_orig_hu = path.replace("dicom", "npy").replace('.dcm', '.npy')
     is_brainscan_server = "/kolos/m2/ct" in path
 
@@ -97,6 +97,10 @@ def main():
 
     with Pool(WORKERS) as p:
         r = list(tqdm.tqdm(p.imap(convert_sample, paths), total=len(paths)))
+
+    # one broken sample, copied train/ID_9180c688de/npy/036.npy to 037.npy
+    # convert_sample('/mnt/data_fast/rsna/train/ID_9180c688de/dicom/037.dcm')
+
 
 
 if __name__ == "__main__":
