@@ -46,7 +46,7 @@ class IntracranialDataset(Dataset):
 
             middle_img_num = int(middle_img_path.stem)
             slices_image = np.zeros((self.config.num_slices, self.config.slice_size, self.config.slice_size))
-            for idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
+            for slice_idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
                                                 middle_img_num + self.config.num_slices // 2 + 1)):
                 if img_num < 0:
                     img_num = 0
@@ -58,7 +58,7 @@ class IntracranialDataset(Dataset):
                 # temporary workaround for bigger images
                 if slice_img.shape != (self.config.slice_size, self.config.slice_size):
                     slice_img = slice_img[:self.config.slice_size, :self.config.slice_size]
-                slices_image[idx] = slice_img
+                slices_image[slice_idx] = slice_img
 
             if normalize_train:
                 slices_image = normalize_train(slices_image,
