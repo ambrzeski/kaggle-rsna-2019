@@ -32,7 +32,7 @@ class IntracranialDataset(Dataset):
         self.scale_values = scale_values  # scale all images data to values around 1
 
         if csv_root_dir is None:
-            csv_root_dir = os.path.normpath(__file__ + '/../../datasets')
+            csv_root_dir = os.path.normpath(__file__ + '/../csv')
 
         data = pd.read_csv(os.path.join(csv_root_dir, csv_file))
         data = data[data.fold.isin(folds)]

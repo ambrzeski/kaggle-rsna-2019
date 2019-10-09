@@ -47,7 +47,7 @@ train_data = IntracranialDataset('5fold.csv', folds=[0, 1, 2, 3], return_labels=
 val_data = IntracranialDataset('5fold.csv', folds=[4], return_labels=True)
 ```
 
-5fold.csv is a dataset file including all the training data, split into 5 folds. The file is located in rsna19/datasets.
+5fold.csv is a dataset file including all the training data, split into 5 folds. The file is located in rsna19/data/csv.
 
 
 ## Notes on diagnostic windows
