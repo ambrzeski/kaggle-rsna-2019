@@ -50,4 +50,4 @@ class BalancedBatchSampler(Sampler):
         return sampled_df.index
 
     def __len__(self):
-        return len(self.data)
+        return int(len(self.data)/int(self.config.batch_size/len(self.config.gpus)))
