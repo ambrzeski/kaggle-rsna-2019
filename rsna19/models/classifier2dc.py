@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 
 from rsna19.data.dataset import IntracranialDataset
+from rsna19.models.balancing_sampler import BalancedBatchSampler
 import rsna19.models.metrics as metrics
 
 
@@ -102,9 +103,8 @@ class Classifier2DC(pl.LightningModule):
     @pl.data_loader
     def train_dataloader(self):
         return DataLoader(IntracranialDataset(self.config, self.train_folds),
-                          shuffle=True,
                           num_workers=self.config.num_workers,
-                          batch_size=self.config.batch_size)
+                          batch_sampler=BalancedBatchSampler(self.config, self.train_folds))
 
     @pl.data_loader
     def val_dataloader(self):
