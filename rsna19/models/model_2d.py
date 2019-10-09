@@ -38,6 +38,7 @@ class ClassificationModelResNextGWAP(nn.Module):
         super().__init__()
         self.base_model = base_model
         self.dropout = dropout
+        self.nb_features = nb_features
 
         self.l1_4 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.base_model.layer0[0] = self.l1_4
@@ -59,19 +60,32 @@ class ClassificationModelResNextGWAP(nn.Module):
         for param in self.base_model.parameters():
             param.requires_grad = True
 
-    def forward(self, inputs):
+    def forward(self, inputs, output_heatmap=False, output_per_pixel=False):
         x = self.base_model.layer0(inputs)
         x = self.base_model.layer1(x)
         x = self.base_model.layer2(x)
         x = self.base_model.layer3(x)
         x = self.base_model.layer4(x)
-        x = self.gwap(x)
+        res = []
+
+        if output_per_pixel:
+            # conv = nn.Conv2d(x.shape[1], self.nb_features, kernel_size=1)
+            # print(self.fc.weight.shape, self.fc.bias.shape)
+            # print(conv.weight.shape, conv.bias.shape)
+            # conv.load_state_dict({"weight": self.fc.weight[:, :, None, None],
+            #                       "bias": self.fc.bias})
+            res.append(F.conv2d(x, self.fc.weight[:, :, None, None], self.fc.bias))
+
+        x, heatmap = self.gwap(x, output_heatmap=True)
+        if output_heatmap:
+            res.append(heatmap)
 
         if self.dropout > 0:
             x = F.dropout(x, self.dropout, self.training)
         out = self.fc(x)
+        res.append(out)
 
-        return out
+        return res
 
 
 def classification_model_se_resnext50_gwap(**kwargs):

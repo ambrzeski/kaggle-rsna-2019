@@ -43,26 +43,17 @@ class IntracranialDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-
         img_path = os.path.normpath(os.path.join(config.data_root, '..', self.data.loc[idx, 'path']))
         img = np.load(img_path).astype(np.float) * self.scale_values
-        s0, s1 = img.shape
-        if s0 < 512:
-            img = np.pad(img, ((0, 512 - s0), (0, 0)), mode='edge')
-        if s0 > 512:
-            img = img[:512, :]
-        if s1 < 512:
-            img = np.pad(img, ((0, 0), (0, 512-s1)), mode='edge')
-        if s1 > 512:
-            img = img[:, :512]
 
-        if self.img_size != 512:
+        if img.shape != (self.img_size, self.img_size):
             img = cv2.resize(img, (self.img_size, self.img_size), cv2.INTER_AREA)
 
-        img = img[None, :, :]
+        img = img[:, :, None]
 
         if self.preprocess_func:
-            img = self.preprocess_func(img)
+            processed = self.preprocess_func(image=img)
+            img = processed['image']
 
         if self.return_labels:
             labels = torch.tensor(self.data.loc[idx, ['epidural',
@@ -78,9 +69,23 @@ class IntracranialDataset(Dataset):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+    import albumentations
+    import albumentations.pytorch
+    import cv2
 
-    ds = IntracranialDataset(csv_file='5fold.csv', folds=[0], img_size=256)
-    sample = ds[0]
-    print(sample['labels'], sample['image'].shape)
-    plt.imshow(sample['image'][0])
-    plt.show()
+    ds = IntracranialDataset(csv_file='5fold.csv', folds=[0], img_size=256,
+                             preprocess_func=albumentations.Compose([
+                                 albumentations.ShiftScaleRotate(
+                                     shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
+                                     interpolation=cv2.INTER_LINEAR,
+                                     border_mode=cv2.BORDER_REPLICATE,
+                                     p=0.75),
+                                 albumentations.pytorch.ToTensorV2()
+                             ]),
+                             )
+    for i in range(16):
+        sample = ds[0]
+        img = sample['image']  # .detach().numpy()
+        print(sample['labels'], img.shape, img.min(), img.max())
+        plt.imshow(img[0])
+        plt.show()
