@@ -10,6 +10,8 @@ from rsna19.data.utils import normalize_train
 
 
 class IntracranialDataset(Dataset):
+    _HU_AIR = -1000
+
     def __init__(self, config, folds, return_labels=True):
         """
         :param csv_file: path to csv file
@@ -35,51 +37,44 @@ class IntracranialDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        try:
-            path = os.path.normpath(os.path.join(self.config.data_root, '..', self.data.loc[idx, 'path']))
+        path = os.path.normpath(os.path.join(self.config.data_root, '..', self.data.loc[idx, 'path']))
 
-            # todo it would be better to have generic paths in csv and parameter specifying which data version to use
-            if self.config.slice_size == 256:
-                path = path.replace('npy/', 'npy256/')
+        # todo it would be better to have generic paths in csv and parameter specifying which data version to use
+        if self.config.slice_size == 256:
+            path = path.replace('npy/', 'npy256/')
 
-            middle_img_path = Path(path)
+        middle_img_path = Path(path)
 
-            middle_img_num = int(middle_img_path.stem)
-            slices_image = np.zeros((self.config.num_slices, self.config.slice_size, self.config.slice_size))
-            for slice_idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
-                                                middle_img_num + self.config.num_slices // 2 + 1)):
-                if img_num < 0:
-                    img_num = 0
-                if img_num > (len(os.listdir(middle_img_path.parent)) - 1):
-                    img_num = len(os.listdir(middle_img_path.parent)) - 1
+        middle_img_num = int(middle_img_path.stem)
+        slices_image = np.zeros((self.config.num_slices, self.config.slice_size, self.config.slice_size))
+        for slice_idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
+                                            middle_img_num + self.config.num_slices // 2 + 1)):
 
+            if img_num < 0 or img_num > (len(os.listdir(middle_img_path.parent)) - 1):
+                slice_img = np.full((self.config.slice_size, self.config.slice_size), self._HU_AIR)
+            else:
                 slice_img = np.load(middle_img_path.parent.joinpath('{:03d}.npy'.format(img_num)))
 
-                # temporary workaround for bigger images
-                if slice_img.shape != (self.config.slice_size, self.config.slice_size):
-                    slice_img = slice_img[:self.config.slice_size, :self.config.slice_size]
-                slices_image[slice_idx] = slice_img
+            # temporary workaround for bigger images
+            if slice_img.shape != (self.config.slice_size, self.config.slice_size):
+                slice_img = slice_img[:self.config.slice_size, :self.config.slice_size]
+            slices_image[slice_idx] = slice_img
 
-            if normalize_train:
-                slices_image = normalize_train(slices_image,
-                                               self.config.min_hu_value,
-                                               self.config.max_hu_value)
+        if normalize_train:
+            slices_image = normalize_train(slices_image,
+                                           self.config.min_hu_value,
+                                           self.config.max_hu_value)
 
-            img = torch.tensor(slices_image, dtype=torch.float32)
+        img = torch.tensor(slices_image, dtype=torch.float32)
 
-            if self.return_labels:
-                labels = torch.tensor(self.data.loc[idx, ['epidural',
-                                                          'intraparenchymal',
-                                                          'intraventricular',
-                                                          'subarachnoid',
-                                                          'subdural',
-                                                          'any']], dtype=torch.float32)
-                return {'image': img, 'labels': labels}
+        if self.return_labels:
+            labels = torch.tensor(self.data.loc[idx, ['epidural',
+                                                      'intraparenchymal',
+                                                      'intraventricular',
+                                                      'subarachnoid',
+                                                      'subdural',
+                                                      'any']], dtype=torch.float32)
+            return {'image': img, 'labels': labels}
 
-            else:
-                return {'image': img}
-        except:
-            if idx + 1 >= len(self):
-                self.__getitem__(idx - 100)
-            else:
-                return self.__getitem__(idx + 1)
+        else:
+            return {'image': img}
