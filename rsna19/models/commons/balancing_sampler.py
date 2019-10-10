@@ -11,7 +11,7 @@ class BalancedBatchSampler(Sampler):
         self.config = config
 
         if config.csv_root_dir is None:
-            csv_root_dir = os.path.normpath(__file__ + '/../../datasets')
+            csv_root_dir = os.path.normpath(__file__ + '/../../../data/csv')
         else:
             csv_root_dir = config.csv_root_dir
 

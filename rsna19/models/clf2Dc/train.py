@@ -6,7 +6,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from test_tube import Experiment
 
-from rsna19.models.classifier2dc import Classifier2DC
+from rsna19.models.clf2Dc.classifier2dc import Classifier2DC
 from rsna19.configs.se_resnext50_2dc import Config
 
 

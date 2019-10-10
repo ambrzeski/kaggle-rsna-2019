@@ -24,7 +24,7 @@ class IntracranialDataset(Dataset):
         self.return_labels = return_labels
 
         if config.csv_root_dir is None:
-            csv_root_dir = os.path.normpath(__file__ + '/../../datasets')
+            csv_root_dir = os.path.normpath(__file__ + '/../csv')
         else:
             csv_root_dir = config.csv_root_dir
 

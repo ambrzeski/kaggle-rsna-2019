@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader
 import numpy as np
 
 from rsna19.data.dataset_2dc import IntracranialDataset
-from rsna19.models.balancing_sampler import BalancedBatchSampler
-import rsna19.models.metrics as metrics
+from rsna19.models.commons.balancing_sampler import BalancedBatchSampler
+import rsna19.models.commons.metrics as metrics
 
 
 class Classifier2DC(pl.LightningModule):
