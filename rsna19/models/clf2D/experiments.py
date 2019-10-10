@@ -1,4 +1,4 @@
-from rsna19.models.v2D import model_2d
+from rsna19.models.clf2D import model_2d
 
 
 class ModelInfo:
