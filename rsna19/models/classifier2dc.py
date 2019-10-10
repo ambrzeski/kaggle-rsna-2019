@@ -82,15 +82,20 @@ class Classifier2DC(pl.LightningModule):
         f1_score = metrics.f1score(y_hat, y, th, True)
         specificity = metrics.specificity(y_hat, y, th, True)
         sensitivity = metrics.sensitivity(y_hat, y, th, True)
+        precision = metrics.precision(y_hat, y)
+        f1__score_spec = metrics.f1score_spec(y_hat, y)
         roc_auc = metrics.roc_auc(y_hat, y)
 
         classes = ['epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any']
-        for acc, f1, spec, sens, roc, class_name in zip(accuracy, f1_score, specificity, sensitivity, roc_auc, classes):
+        for acc, f1, spec, sens, roc, prec, f1_spec, class_name in \
+                zip(accuracy, f1_score, specificity, sensitivity, roc_auc, precision, f1__score_spec, classes):
             out_dict['{}_acc'.format(class_name)] = acc
             out_dict['{}_f1'.format(class_name)] = f1
             out_dict['{}_spec'.format(class_name)] = spec
             out_dict['{}_sens'.format(class_name)] = sens
             out_dict['{}_roc'.format(class_name)] = roc
+            out_dict['{}_prec'.format(class_name)] = prec
+            out_dict['{}_f1_spec'.format(class_name)] = f1_spec
 
         avg_loss = np.stack([x['val_loss'] for x in outputs]).mean()
         out_dict['avg_val_loss'] = avg_loss
