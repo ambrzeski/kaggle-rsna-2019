@@ -1,4 +1,4 @@
-class config:
+class BaseConfig:
     train_dir = '/kolos/storage/ct/data/rsna/stage_1_train_images'
     test_dir = '/kolos/storage/ct/data/rsna/stage_1_test_images'
     labels_path = "/kolos/storage/ct/data/rsna/stage_1_train.csv"
@@ -9,4 +9,5 @@ class config:
     tensorboard_dir = "../output/tensorboard"
     oof_dir = "../output/oof"
 
-
+    n_classes = 6
+    csv_root_dir = None

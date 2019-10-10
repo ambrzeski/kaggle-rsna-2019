@@ -6,7 +6,7 @@ import cv2
 import torch
 from torch.utils.data import Dataset
 
-from rsna19.config import config
+from rsna19.configs.base_config import BaseConfig
 
 
 class IntracranialDataset(Dataset):
@@ -43,7 +43,7 @@ class IntracranialDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        img_path = os.path.normpath(os.path.join(config.data_root, '..', self.data.loc[idx, 'path']))
+        img_path = os.path.normpath(os.path.join(BaseConfig.data_root, '..', self.data.loc[idx, 'path']))
         img = np.load(img_path).astype(np.float) * self.scale_values
 
         if img.shape != (self.img_size, self.img_size):
