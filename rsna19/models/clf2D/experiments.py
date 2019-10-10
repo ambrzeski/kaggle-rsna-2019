@@ -56,4 +56,40 @@ MODELS = {
         initial_lr=1e-4,
         accumulation_steps=1
     ),
+    'dpn92_gwap_256': ModelInfo(
+        factory=model_2d.classification_model_dpn92,
+        args=dict(use_gwap=True),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'dpn92_256': ModelInfo(
+        factory=model_2d.classification_model_dpn92,
+        args=dict(use_gwap=False),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'dpn68_gwap_256': ModelInfo(
+        factory=model_2d.classification_model_dpn68b,
+        args=dict(use_gwap=True),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'dpn68_256': ModelInfo(
+        factory=model_2d.classification_model_dpn68b,
+        args=dict(use_gwap=False),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
 }

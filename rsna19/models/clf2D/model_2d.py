@@ -69,11 +69,6 @@ class ClassificationModelResNextGWAP(nn.Module):
         res = []
 
         if output_per_pixel:
-            # conv = nn.Conv2d(x.shape[1], self.nb_features, kernel_size=1)
-            # print(self.fc.weight.shape, self.fc.bias.shape)
-            # print(conv.weight.shape, conv.bias.shape)
-            # conv.load_state_dict({"weight": self.fc.weight[:, :, None, None],
-            #                       "bias": self.fc.bias})
             res.append(F.conv2d(x, self.fc.weight[:, :, None, None], self.fc.bias))
 
         x, heatmap = self.gwap(x, output_heatmap=True)
@@ -83,12 +78,95 @@ class ClassificationModelResNextGWAP(nn.Module):
         if self.dropout > 0:
             x = F.dropout(x, self.dropout, self.training)
         out = self.fc(x)
-        res.append(out)
 
-        return res
+        if res:
+            res.append(out)
+            return res
+        else:
+            return out
+
+
+class ClassificationModelDPN(nn.Module):
+    def __init__(self, base_model, base_model_features, base_model_l1_outputs, nb_features, dropout=0.5,
+                 use_gwap=True, gwap_scale=2.0):
+        super().__init__()
+        self.dropout = dropout
+        self.base_model = base_model
+        self.nb_features = nb_features
+        self.use_gwap = use_gwap
+
+        self.l1_4 = nn.Conv2d(1, base_model_l1_outputs, kernel_size=7, stride=2, padding=3, bias=False)
+        self.base_model.features[0].conv = self.l1_4
+
+        if use_gwap:
+            self.gwap = GWAP(base_model_features, scale=gwap_scale)
+            self.fc = nn.Linear(base_model_features, nb_features)
+        else:
+            self.fc = nn.Linear(base_model_features*2, nb_features)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        for param in self.l1_4.parameters():
+            param.requires_grad = True
+
+    def unfreeze_encoder(self):
+        self.base_model.requires_grad = True
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs, output_per_pixel=False, output_heatmap=False):
+        x = self.base_model.features(inputs)
+
+        res = []
+
+        if output_per_pixel:
+            res.append(F.conv2d(x, self.fc.weight[:, :, None, None], self.fc.bias))
+
+        heatmap = None
+        if self.use_gwap:
+            x, heatmap = self.gwap(x, output_heatmap=True)
+        else:
+            avg_pool = F.avg_pool2d(x, x.shape[2:])
+            max_pool = F.max_pool2d(x, x.shape[2:])
+            avg_max_pool = torch.cat((avg_pool, max_pool), 1)
+            x = avg_max_pool.view(avg_max_pool.size(0), -1)
+
+        if output_heatmap:
+            res.append(heatmap)
+
+        if self.dropout > 0:
+            x = F.dropout(x, self.dropout, self.training)
+
+        out = self.fc(x)
+
+        if res:
+            res.append(out)
+            return res
+        else:
+            return out
 
 
 def classification_model_se_resnext50_gwap(**kwargs):
     base_model = pretrainedmodels.se_resnext50_32x4d()
     return ClassificationModelResNextGWAP(base_model, nb_features=6, **kwargs)
 
+
+def classification_model_dpn92(**kwargs):
+    base_model = pretrainedmodels.dpn92()
+    return ClassificationModelDPN(base_model,
+                                  base_model_features=2688,
+                                  nb_features=6,
+                                  base_model_l1_outputs=64,
+                                  **kwargs)
+
+
+def classification_model_dpn68b(**kwargs):
+    base_model = pretrainedmodels.dpn68b()
+    return ClassificationModelDPN(base_model,
+                                  base_model_features=832,
+                                  nb_features=6,
+                                  base_model_l1_outputs=10,
+                                  **kwargs)
