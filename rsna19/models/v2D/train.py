@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 
 import torch.nn as nn
 import torch.nn.functional as F
-import config
-import radam
-from experiments import MODELS
+from rsna19 import config
+from rsna19.models.commons import radam
+from rsna19.models.v2D.experiments import MODELS
 from torch.utils.tensorboard import SummaryWriter
 
 
