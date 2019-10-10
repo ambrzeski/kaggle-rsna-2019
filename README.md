@@ -6,9 +6,11 @@ Project source is expected to operate on a converted form of challenge data, inv
 
 First you need to download the Kaggle data, including: stage_1_train_images, stage_1_test_images, and stage_1_train.csv. After downloading the data, open project config file located at:
 
-```rsna19/config.py```
 
 ```
+rsna19/config.py
+----------------
+
 class config:
     train_dir = '/kolos/storage/ct/data/rsna/stage_1_train_images'
     test_dir = '/kolos/storage/ct/data/rsna/stage_1_test_images'
@@ -19,7 +21,7 @@ class config:
 
 Modify train_dir, test_dir and labels_path variables to make them point to appropriate data paths on your hard drive. Also, modify the data_root variable to indicate output directory, where the converted data should be saved.
 
-Next, three scripts be should executed to perform the full process of conversion. The scripts can be run right away if you open the project in PyCharm. Otherwise you may need add project package to PYTHONPATH:
+Next, three scripts should be executed to perform the full process of conversion. The scripts can be run right away if you open the project in PyCharm. Otherwise you may need add project package to PYTHONPATH:
 
 ```export PYTHONPATH="$PYTHONPATH:/{path}/{to}/kaggle-rsna-2019/rsna19/"```
 
@@ -33,7 +35,7 @@ $ python rsna19/data/scripts/create_dataframe.py
 $ python rsna19/data/scripts/create_symlinks.py
 
 # Export dicom images (slices) to:
-#   - npy arrays - for faster loading durng training (>3x faster)
+#   - npy arrays - for faster loading during training (>3x faster)
 #   - png images - for easier viewing and browsing the images
 $ python rsna19/data/scripts/convert_dataset.py
 ```
@@ -45,7 +47,7 @@ train_data = IntracranialDataset('5fold.csv', folds=[0, 1, 2, 3], return_labels=
 val_data = IntracranialDataset('5fold.csv', folds=[4], return_labels=True)
 ```
 
-5fold.csv is a dataset file including all the training data split into 5 folds. The file is located in rsna19/datasets.
+5fold.csv is a dataset file including all the training data, split into 5 folds. The file is located in rsna19/data/csv.
 
 
 ## Notes on diagnostic windows

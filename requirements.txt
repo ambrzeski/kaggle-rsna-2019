@@ -6,3 +6,6 @@ pytorch_lightning
 test_tube
 torch
 scipy
+python-opencv
+scipy
+future
