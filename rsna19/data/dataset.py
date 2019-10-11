@@ -43,7 +43,8 @@ class IntracranialDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        img_path = os.path.normpath(os.path.join(config.data_root, '..', self.data.loc[idx, 'path']))
+        data_path = self.data.loc[idx, 'path']
+        img_path = os.path.normpath(os.path.join(config.data_root, '..', data_path))
         img = np.load(img_path).astype(np.float) * self.scale_values
 
         if img.shape != (self.img_size, self.img_size):
@@ -55,6 +56,12 @@ class IntracranialDataset(Dataset):
             processed = self.preprocess_func(image=img)
             img = processed['image']
 
+        res = {
+            'idx': idx,
+            'image': img,
+            'path': data_path,
+        }
+
         if self.return_labels:
             labels = torch.tensor(self.data.loc[idx, ['epidural',
                                                       'intraparenchymal',
@@ -62,9 +69,9 @@ class IntracranialDataset(Dataset):
                                                       'subarachnoid',
                                                       'subdural',
                                                       'any']], dtype=torch.float)
-            return {'image': img, 'labels': labels}
-        else:
-            return {'image': img}
+            res['labels'] = labels
+
+        return res
 
 
 if __name__ == '__main__':
@@ -86,6 +93,6 @@ if __name__ == '__main__':
     for i in range(16):
         sample = ds[0]
         img = sample['image']  # .detach().numpy()
-        print(sample['labels'], img.shape, img.min(), img.max())
+        print(sample['labels'], img.shape, img.min(), img.max(), sample)
         plt.imshow(img[0])
         plt.show()
