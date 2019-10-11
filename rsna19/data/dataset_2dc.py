@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+import albumentations
+import cv2
 
 from rsna19.data.utils import normalize_train
 
@@ -64,6 +66,17 @@ class IntracranialDataset(Dataset):
             slices_image = normalize_train(slices_image,
                                            self.config.min_hu_value,
                                            self.config.max_hu_value)
+
+        if self.return_labels:
+            augmentations = albumentations.Compose([
+                albumentations.ShiftScaleRotate(
+                    shift_limit=24. / 256, scale_limit=0.15, rotate_limit=30,
+                    interpolation=cv2.INTER_LINEAR,
+                    border_mode=cv2.BORDER_REPLICATE,
+                    p=0.8),
+            ])
+            processed = augmentations(image=slices_image)
+            slices_image = processed['image']
 
         img = torch.tensor(slices_image, dtype=torch.float32)
 
