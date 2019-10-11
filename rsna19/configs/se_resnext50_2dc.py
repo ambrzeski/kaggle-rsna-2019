@@ -21,6 +21,9 @@ class Config(BaseConfig):
 
     num_slices = 3  # must be odd
     slice_size = 256
+    use_cdf = False
+
+    # used only if use_cdf is False
     min_hu_value = -1000
     max_hu_value = 1000
 

@@ -9,6 +9,7 @@ import albumentations
 import cv2
 
 from rsna19.data.utils import normalize_train
+from rsna19.preprocessing.hu_converter import HuConverter
 
 
 class IntracranialDataset(Dataset):
@@ -36,6 +37,9 @@ class IntracranialDataset(Dataset):
         data = data.reset_index()
         self.data = data
 
+        if self.config.use_cdf:
+            self.hu_converter = HuConverter
+
     def __len__(self):
         return len(self.data)
 
@@ -51,7 +55,7 @@ class IntracranialDataset(Dataset):
         middle_img_num = int(middle_img_path.stem)
         slices_image = np.zeros((self.config.num_slices, self.config.slice_size, self.config.slice_size))
         for slice_idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
-                                            middle_img_num + self.config.num_slices // 2 + 1)):
+                                                  middle_img_num + self.config.num_slices // 2 + 1)):
 
             if img_num < 0 or img_num > (len(os.listdir(middle_img_path.parent)) - 1):
                 slice_img = np.full((self.config.slice_size, self.config.slice_size), self._HU_AIR)
@@ -63,7 +67,10 @@ class IntracranialDataset(Dataset):
                 slice_img = slice_img[:self.config.slice_size, :self.config.slice_size]
             slices_image[slice_idx] = slice_img
 
-        if normalize_train:
+        if self.config.use_cdf:
+            slices_image = self.hu_converter.convert(slices_image)
+            slices_image = slices_image / (np.iinfo(np.uint16).max / 2) - 1
+        else:
             slices_image = normalize_train(slices_image,
                                            self.config.min_hu_value,
                                            self.config.max_hu_value)
