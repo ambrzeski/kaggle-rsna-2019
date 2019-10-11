@@ -14,7 +14,7 @@ from rsna19.data.utils import normalize_train
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, return_labels=True):
+    def __init__(self, config, folds, return_labels=True, augment=False):
         """
         :param csv_file: path to csv file
         :param folds: list of selected folds
@@ -24,6 +24,7 @@ class IntracranialDataset(Dataset):
         """
         self.config = config
         self.return_labels = return_labels
+        self.augment = augment
 
         if config.csv_root_dir is None:
             csv_root_dir = os.path.normpath(__file__ + '/../csv')
@@ -67,7 +68,7 @@ class IntracranialDataset(Dataset):
                                            self.config.min_hu_value,
                                            self.config.max_hu_value)
 
-        if self.return_labels:
+        if self.augment:
             augmentations = albumentations.Compose([
                 albumentations.ShiftScaleRotate(
                     shift_limit=24. / 256, scale_limit=0.15, rotate_limit=30,

@@ -1,4 +1,3 @@
-
 import pretrainedmodels
 import pytorch_lightning as pl
 import torch
@@ -32,7 +31,8 @@ class Classifier2DC(pl.LightningModule):
         if model == 'se_resnext50':
             cut_point = -2
             pretrained = 'imagenet' if pretrained else None
-            return nn.Sequential(*list(pretrainedmodels.se_resnext50_32x4d(pretrained=pretrained).children())[:cut_point])
+            return nn.Sequential(
+                *list(pretrainedmodels.se_resnext50_32x4d(pretrained=pretrained).children())[:cut_point])
 
         if model == 'se_resnet50':
             cut_point = -2
@@ -107,13 +107,17 @@ class Classifier2DC(pl.LightningModule):
 
     @pl.data_loader
     def train_dataloader(self):
-        return DataLoader(IntracranialDataset(self.config, self.train_folds),
-                          num_workers=self.config.num_workers,
-                          batch_sampler=BalancedBatchSampler(self.config, self.train_folds))
+        if self.config.balancing:
+            return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment),
+                              num_workers=self.config.num_workers,
+                              batch_sampler=BalancedBatchSampler(self.config, self.train_folds))
+        else:
+            return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment),
+                              num_workers=self.config.num_workers,
+                              batch_size=self.config.batch_size)
 
     @pl.data_loader
     def val_dataloader(self):
         return DataLoader(IntracranialDataset(self.config, self.val_folds),
                           num_workers=self.config.num_workers,
                           batch_size=self.config.batch_size)
-
