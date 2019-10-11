@@ -92,4 +92,43 @@ MODELS = {
         initial_lr=1e-4,
         accumulation_steps=1
     ),
+    'mobilenet_v2_gwap_256': ModelInfo(
+        factory=model_2d.classification_model_mobilenet_v2,
+        args=dict(use_gwap=True),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1,
+        optimiser_milestones=[8, 16, 24]
+    ),
+    'resnet34_256': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1,
+        optimiser_milestones=[8, 16, 24]
+    ),
+    'resnet34_256_16_windows': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_windows_conv=16),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1,
+        optimiser_milestones=[8, 16, 24]
+    ),
+    'dpn68_256_64_windows': ModelInfo(
+        factory=model_2d.classification_model_dpn68b,
+        args=dict(use_gwap=True, nb_windows_conv=64),
+        dataset_args=dict(img_size=256, scale_values=1e-3),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
 }
