@@ -6,6 +6,9 @@ pytorch_lightning
 test_tube
 torch
 scipy
-python-opencv
+opencv-python
 scipy
 future
+albumentations
+matplotlib
+pretrainedmodels

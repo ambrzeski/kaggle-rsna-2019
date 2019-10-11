@@ -35,7 +35,8 @@ def main():
                       checkpoint_callback=checkpoint_callback,
                       gpus=config.gpus,
                       nb_sanity_val_steps=20,
-                      val_check_interval=0.33,
+                      val_check_interval=0.25,
+                      row_log_interval=1000,
                       )
 
     trainer.fit(model)
