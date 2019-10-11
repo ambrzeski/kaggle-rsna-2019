@@ -9,7 +9,7 @@ from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 from tqdm import tqdm
-from data import dataset
+from rsna19.data import dataset
 import albumentations
 import albumentations.pytorch
 import cv2
@@ -18,7 +18,7 @@ import sklearn.metrics
 
 import torch.nn as nn
 import torch.nn.functional as F
-from rsna19 import config
+from rsna19.configs.base_config import BaseConfig
 from rsna19.models.commons import radam
 from rsna19.models.commons import metrics
 from rsna19.models.clf2D.experiments import MODELS
@@ -57,9 +57,9 @@ def train(model_name, fold, run=None, resume_epoch=-1):
 
     model_info = MODELS[model_name]
 
-    checkpoints_dir = f'{config.config.checkpoints_dir}/{model_str}'
-    tensorboard_dir = f'{config.config.tensorboard_dir}/{model_str}'
-    oof_dir = f'{config.config.oof_dir}/{model_str}'
+    checkpoints_dir = f'{BaseConfig.checkpoints_dir}/{model_str}'
+    tensorboard_dir = f'{BaseConfig.tensorboard_dir}/{model_str}'
+    oof_dir = f'{BaseConfig.oof_dir}/{model_str}'
     os.makedirs(checkpoints_dir, exist_ok=True)
     os.makedirs(tensorboard_dir, exist_ok=True)
     os.makedirs(oof_dir, exist_ok=True)
@@ -82,7 +82,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
 
     dataset_train = dataset.IntracranialDataset(
         csv_file='5fold.csv',
-        folds=[f for f in range(config.config.nb_folds) if f != fold],
+        folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
         preprocess_func=albumentations.Compose([
             albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
                                             interpolation=cv2.INTER_LINEAR,
@@ -229,7 +229,7 @@ def check_heatmap(model_name, fold, epoch, run=None):
     model_str = build_model_str(model_name, fold, run)
     model_info = MODELS[model_name]
 
-    checkpoints_dir = f'{config.config.checkpoints_dir}/{model_str}'
+    checkpoints_dir = f'{BaseConfig.checkpoints_dir}/{model_str}'
     print('\n', model_name, '\n')
 
     model = model_info.factory(**model_info.args)

@@ -2,6 +2,13 @@ numpy
 pandas
 tqdm
 pydicom
-python-opencv
+pytorch_lightning
+test_tube
+torch
+scipy
+opencv-python
 scipy
 future
+albumentations
+matplotlib
+pretrainedmodels
