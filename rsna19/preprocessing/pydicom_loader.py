@@ -1,3 +1,4 @@
+import numpy as np
 import pydicom
 
 from rsna19.preprocessing.hu_converter import HuConverter
@@ -27,11 +28,11 @@ class PydicomLoader:
 
     def load(self, path, convert_hu=True):
         data = pydicom.read_file(path)
-        image = data.pixel_array
+        image = data.pixel_array.astype(np.int32)
         window_center, window_width, intercept, slope = self.get_windowing(data)
         image = self.window_image(image, intercept, slope)
 
         if convert_hu:
             image = self.hu_converter.convert(image)
 
-        return image
+        return image.astype(np.int16)
