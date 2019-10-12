@@ -6,7 +6,7 @@ from scipy.interpolate import interp1d
 class HuConverter:
     """Class for converting HU units to 8 bits or number of bits specified in cdf"""
     min_hu_value = -400
-    max_hu_value = 2000
+    max_hu_value = 1000
 
     cdf = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cdf.npy"))
     window = (min_hu_value, max_hu_value)

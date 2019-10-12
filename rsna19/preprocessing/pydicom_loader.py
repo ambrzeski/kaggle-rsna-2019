@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pydicom
 
@@ -6,7 +8,9 @@ from rsna19.preprocessing.hu_converter import HuConverter
 
 class PydicomLoader:
     def __init__(self):
-        self.hu_converter = HuConverter()
+        cdf = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cdf_vis.npy"))
+        self.hu_converter = HuConverter
+        self.hu_converter.change_convert_params(cdf, (-400, 2000))
 
     def window_image(self, img, intercept, slope):
         return img * slope + intercept
