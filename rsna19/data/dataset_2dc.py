@@ -95,7 +95,7 @@ class IntracranialDataset(Dataset):
                                                       'subarachnoid',
                                                       'subdural',
                                                       'any']], dtype=torch.float32)
-            return {'image': img, 'labels': labels}
+            return {'image': img, 'labels': labels, 'path': path}
 
         else:
             return {'image': img}
