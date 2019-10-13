@@ -69,7 +69,6 @@ class IntracranialDataset(Dataset):
 
         if self.config.use_cdf:
             slices_image = self.hu_converter.convert(slices_image)
-            slices_image = slices_image / (np.iinfo(np.uint16).max / 2) - 1
         else:
             slices_image = normalize_train(slices_image,
                                            self.config.min_hu_value,

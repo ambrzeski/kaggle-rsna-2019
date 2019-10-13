@@ -22,9 +22,9 @@ def main():
 
     checkpoint_callback = ModelCheckpoint(
         filepath=os.path.join(config.train_out_dir, "models"),
-        save_best_only=False,
+        save_best_only=True,
         verbose=True,
-        monitor='val_loss',
+        monitor='avg_val_loss',
         mode='min',
         prefix=''
     )
@@ -36,7 +36,7 @@ def main():
                       gpus=config.gpus,
                       nb_sanity_val_steps=20,
                       val_check_interval=0.25,
-                      row_log_interval=1000,
+                      row_log_interval=1000
                       )
 
     trainer.fit(model)
