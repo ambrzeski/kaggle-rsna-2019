@@ -21,7 +21,11 @@ def predict(checkpoint_path, device, subset):
     os.makedirs(os.path.dirname(df_out_path), exist_ok=True)
 
     with open(config_path, 'r') as f:
-        config = type('config', (), json.load(f))
+        config_dict = json.load(f)
+        if 'dropout' not in config_dict:
+            config_dict['dropout'] = 0
+        config = type('config', (), config_dict)
+
 
     with torch.cuda.device(device):
         checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
@@ -82,8 +86,10 @@ def predict(checkpoint_path, device, subset):
 
 if __name__ == '__main__':
     checkpoint_paths = [
-        '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_2_3/models/_ckpt_epoch_3.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_2_4/models/_ckpt_epoch_3.ckpt'
+        '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_3/models/_ckpt_epoch_2.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_4/models/_ckpt_epoch_2.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0007_window1/0_1_2_3/models/_ckpt_epoch_2.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0008_window2/0_1_2_3/models/_ckpt_epoch_2.ckpt',
     ]
 
-    predict(checkpoint_paths[0], 0, 'test')
+    predict(checkpoint_paths[3], 3, 'test')
