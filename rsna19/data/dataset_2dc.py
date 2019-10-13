@@ -15,7 +15,7 @@ from rsna19.preprocessing.hu_converter import HuConverter
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, test, augment=False):
+    def __init__(self, config, folds, test=False, augment=False):
         """
         :param folds: list of selected folds
         :param return_labels: if True, labels will be returned with image
