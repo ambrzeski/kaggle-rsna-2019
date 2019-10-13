@@ -15,16 +15,13 @@ from rsna19.preprocessing.hu_converter import HuConverter
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, return_labels=True, augment=False):
+    def __init__(self, config, folds, test, augment=False):
         """
-        :param csv_file: path to csv file
         :param folds: list of selected folds
-        :param csv_root_dir: prepended to csv_file path, defaults to project's rsna19/datasets
         :param return_labels: if True, labels will be returned with image
-        :param preprocess_func: preprocessing function, e.g. for window adjustment
         """
         self.config = config
-        self.return_labels = return_labels
+        self.test = test
         self.augment = augment
 
         if config.csv_root_dir is None:
@@ -32,8 +29,10 @@ class IntracranialDataset(Dataset):
         else:
             csv_root_dir = config.csv_root_dir
 
-        data = pd.read_csv(os.path.join(csv_root_dir, config.dataset_file))
-        data = data[data.fold.isin(folds)]
+        dataset_file = 'test.csv' if test else self.config.dataset_file
+        data = pd.read_csv(os.path.join(csv_root_dir, dataset_file))
+        if not test:
+            data = data[data.fold.isin(folds)]
         data = data.reset_index()
         self.data = data
 
@@ -44,7 +43,10 @@ class IntracranialDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        path = os.path.normpath(os.path.join(self.config.data_root, '..', self.data.loc[idx, 'path']))
+        path = self.data.loc[idx, 'path']
+        study_id = path.split('/')[2]
+        slice_num = os.path.basename(path).split('.')[0]
+        path = os.path.normpath(os.path.join(self.config.data_root, '..', path))
 
         # todo it would be better to have generic paths in csv and parameter specifying which data version to use
         if self.config.slice_size == 256:
@@ -87,14 +89,19 @@ class IntracranialDataset(Dataset):
 
         img = torch.tensor(slices_image, dtype=torch.float32)
 
-        if self.return_labels:
-            labels = torch.tensor(self.data.loc[idx, ['epidural',
-                                                      'intraparenchymal',
-                                                      'intraventricular',
-                                                      'subarachnoid',
-                                                      'subdural',
-                                                      'any']], dtype=torch.float32)
-            return {'image': img, 'labels': labels, 'path': path}
+        out = {
+            'image': img,
+            'path': path,
+            'study_id': study_id,
+            'slice_num': slice_num
+        }
 
-        else:
-            return {'image': img}
+        if not self.test:
+            out['labels'] = torch.tensor(self.data.loc[idx, ['epidural',
+                                                             'intraparenchymal',
+                                                             'intraventricular',
+                                                             'subarachnoid',
+                                                             'subdural',
+                                                             'any']], dtype=torch.float32)
+
+        return out
