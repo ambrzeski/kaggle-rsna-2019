@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+import random
+import sys
 
 import numpy as np
 import pandas as pd
@@ -78,15 +80,7 @@ class IntracranialDataset(Dataset):
                                            self.config.max_hu_value)
 
         if self.augment:
-            augmentations = albumentations.Compose([
-                albumentations.ShiftScaleRotate(
-                    shift_limit=24. / 256, scale_limit=0.15, rotate_limit=30,
-                    interpolation=cv2.INTER_LINEAR,
-                    border_mode=cv2.BORDER_REPLICATE,
-                    p=0.8),
-            ])
-            processed = augmentations(image=slices_image)
-            slices_image = processed['image']
+            slices_image = self.apply_augmentation(slices_image)
 
         img = torch.tensor(slices_image, dtype=torch.float32)
 
@@ -106,3 +100,34 @@ class IntracranialDataset(Dataset):
                                                              'any']], dtype=torch.float32)
 
         return out
+
+    def apply_augmentation(self, slices_image):
+        augmentations = albumentations.Compose([
+            albumentations.ShiftScaleRotate(
+                shift_limit=24. / 256, scale_limit=0.15, rotate_limit=30,
+                interpolation=cv2.INTER_LINEAR,
+                border_mode=cv2.BORDER_REPLICATE,
+                p=0.8),
+        ])
+
+        processed_image = []
+        random_seed = random.randint(-sys.maxsize - 1, sys.maxsize)
+        for image in list(slices_image):
+            random.seed(random_seed)
+            processed_image.append(augmentations(image=image)['image'])
+
+        return processed_image
+
+
+def main():
+    from rsna19.configs.se_resnext50_2dc import Config
+
+    for x in IntracranialDataset(Config(), folds=[0, 1, 2, 3], augment=True):
+        for img_slice in list(x['image']):
+            img_slice = np.clip(((np.array(img_slice) + 1)*255), 0, 255).astype(np.uint8)
+            cv2.imshow('slice', img_slice)
+            cv2.waitKey()
+
+
+if __name__ == "__main__":
+    main()
