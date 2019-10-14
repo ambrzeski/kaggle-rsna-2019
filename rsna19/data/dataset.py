@@ -39,6 +39,12 @@ class IntracranialDataset(Dataset):
         if csv_root_dir is None:
             csv_root_dir = os.path.normpath(__file__ + '/../csv')
 
+        if 'test' in csv_file:
+            centers_csv_file = os.path.join(csv_root_dir, 'test_centers.csv')
+        else:
+            centers_csv_file = os.path.join(csv_root_dir, 'train_centers.csv')
+        self.centers_data = pd.read_csv(centers_csv_file).set_index('study_id', drop=True)
+
         data = pd.read_csv(os.path.join(csv_root_dir, csv_file))
         data = data[data.fold.isin(folds)]
         data = data.reset_index()
@@ -55,21 +61,19 @@ class IntracranialDataset(Dataset):
         if img.shape != (self.img_size, self.img_size):
             img = cv2.resize(img, (self.img_size, self.img_size), cv2.INTER_AREA)
 
+        if self.center_crop > 0:
+            study_id = data_path.split('/')[-3]
+            center_row, center_col = self.centers_data.loc[study_id, ['center_row', 'center_col']]
+            from_row = int(np.clip(center_row - self.center_crop // 2, 0, self.img_size - self.center_crop))
+            from_col = int(np.clip(center_col - self.center_crop // 2, 0, self.img_size - self.center_crop))
+
+            img = img[from_row:from_row + self.center_crop, from_col:from_col + self.center_crop]
+
         img = img[:, :, None]
 
         if self.preprocess_func:
             processed = self.preprocess_func(image=img)
             img = processed['image']
-
-            # assuming pre-processing changes order.
-            # do crop after pre-processing for better corners rotation
-            if self.center_crop > 0:
-                offset = (self.img_size - self.center_crop) // 2
-                img = img[:, offset:-offset, offset:-offset]
-        else:
-            if self.center_crop > 0:
-                offset = (self.img_size - self.center_crop) // 2
-                img = img[offset:-offset, offset:-offset, :]
 
         if self.apply_windows is not None:
             if isinstance(img, torch.Tensor):
@@ -118,7 +122,7 @@ if __name__ == '__main__':
 
     ds = IntracranialDataset(csv_file='5fold.csv', folds=[0],
                              img_size=512,
-                             # center_crop=384,
+                             center_crop=384,
                              apply_windows=[
                                 _w(w=80, l=40),
                                 _w(w=130, l=75),
