@@ -65,7 +65,8 @@ class IntracranialDataset(Dataset):
                 slice_img = np.load(middle_img_path.parent.joinpath('{:03d}.npy'.format(img_num)))
 
             if slice_img.shape != (self.config.slice_size, self.config.slice_size):
-                slice_img = cv2.resize(slice_img, (self.config.slice_size, self.config.slice_size), cv2.INTER_AREA)
+                slice_img = cv2.resize(np.int16(slice_img), (self.config.slice_size, self.config.slice_size),
+                                       interpolation=cv2.INTER_AREA)
 
             slices_image[slice_idx] = slice_img
 
