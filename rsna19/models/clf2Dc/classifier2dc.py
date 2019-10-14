@@ -49,7 +49,9 @@ class Classifier2DC(pl.LightningModule):
                 model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(7, 7),
                                            stride=(2, 2), padding=(3, 3), bias=False)
 
-        model[0].conv1.weight.data.fill_(0.)
+        if self.config.num_slices != 3:
+            model[0].conv1.weight.data.fill_(0.)
+
         return model
 
     def __init__(self, config):
