@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import log_loss
 from torch.nn import functional as F
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 import numpy as np
 
@@ -55,6 +56,7 @@ class Classifier2DC(pl.LightningModule):
             self.dropout = nn.Dropout(self.config.dropout)
         else:
             self.dropout = None
+        self.scheduler = None
 
     def forward(self, x):
         x = self.backbone(x)
@@ -69,7 +71,10 @@ class Classifier2DC(pl.LightningModule):
         x, y = batch['image'], batch['labels']
         y_hat = self.forward(x)
         class_weights = torch.tensor(self._CLASS_WEIGHTS, dtype=torch.float32).to(y_hat.get_device())
-        return {'loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights)}
+
+        lr = self.trainer.optimizers[0].param_groups[0]['lr']
+        return {'loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights),
+                'progress': {'learning_rate': lr}}
 
     def validation_step(self, batch, batch_nb):
         x, y = batch['image'], batch['labels']
@@ -97,8 +102,8 @@ class Classifier2DC(pl.LightningModule):
 
         # compute per-class loss
         class_weights = torch.tensor(self._CLASS_WEIGHTS, dtype=torch.float64)
-        losses = F.binary_cross_entropy(torch.tensor(y_hat, dtype=torch.float64),torch.tensor(y, dtype=torch.float64),
-                                      weight=class_weights, reduction='none')
+        losses = F.binary_cross_entropy(torch.tensor(y_hat, dtype=torch.float64), torch.tensor(y, dtype=torch.float64),
+                                        weight=class_weights, reduction='none')
         losses = losses.mean(dim=0)
 
         classes = ['epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any']
@@ -117,15 +122,29 @@ class Classifier2DC(pl.LightningModule):
         out_dict['avg_val_loss'] = avg_loss
 
         # implementation probably used in competition, gives slightly different results than torch
-        out_dict['val_loss_sklearn'] = log_loss(y.flatten(), y_hat.flatten(), sample_weight=self._CLASS_WEIGHTS * y.shape[0])
+        out_dict['val_loss_sklearn'] = log_loss(y.flatten(), y_hat.flatten(),
+                                                sample_weight=self._CLASS_WEIGHTS * y.shape[0])
 
         return out_dict
 
+    def on_batch_start(self, batch):
+        if self.config.scheduler['name'] == 'flat_anneal':
+            flat_iter = self.config.scheduler['flat_iterations']
+            anneal_iter = self.config.scheduler['anneal_iterations']
+            if flat_iter <= self.global_step < flat_iter + anneal_iter:
+                self.scheduler.step()
+
     def configure_optimizers(self):
         if self.config.optimizer == 'adam':
-            return torch.optim.Adam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
         elif self.config.optimizer == 'radam':
-            return RAdam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+            optimizer = RAdam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+
+        if self.config.scheduler['name'] == 'flat_anneal':
+            self.scheduler = CosineAnnealingLR(optimizer, self.config.scheduler['anneal_iterations'],
+                                               self.config.scheduler['min_lr'])
+
+        return optimizer
 
     @pl.data_loader
     def train_dataloader(self):
