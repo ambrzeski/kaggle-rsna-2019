@@ -2,11 +2,11 @@ from rsna19.configs.base_config import BaseConfig
 
 
 class Config(BaseConfig):
-    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_2_4'
+    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0013_multiple_input_channels_5/0_1_2_3'
 
     dataset_file = '5fold.csv'
-    train_folds = [0, 1, 2, 4]
-    val_folds = [3]
+    train_folds = [0, 1, 2, 3]
+    val_folds = [4]
 
     backbone = 'se_resnext50'
     pretrained = True
@@ -22,7 +22,7 @@ class Config(BaseConfig):
 
     max_epoch = 20
 
-    num_slices = 3  # must be odd
+    num_slices = 5  # must be odd
     slice_size = 256
     use_cdf = True
     augment = True
