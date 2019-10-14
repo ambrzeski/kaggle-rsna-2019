@@ -20,41 +20,37 @@ class Classifier2DC(pl.LightningModule):
 
     def get_base_model(self, model, pretrained):
         _available_models = ['senet154', 'se_resnet50', 'se_resnext50']
+        pretrained = 'imagenet' if pretrained else None
 
         if model not in _available_models:
             raise ValueError('Unavailable backbone, choose one from {}'.format(_available_models))
 
         if model == 'senet154':
             cut_point = -3
-            pretrained = 'imagenet' if pretrained else None
             model = nn.Sequential(*list(pretrainedmodels.senet154(pretrained=pretrained).children())[:cut_point])
 
             if self.config.num_slices != 3:
                 model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(3, 3),
                                            stride=(2, 2), padding=(1, 1), bias=False)
 
-            return model
-
-        if model == 'se_resnext50':
+        elif model == 'se_resnext50':
             cut_point = -2
-            pretrained = 'imagenet' if pretrained else None
             model = nn.Sequential(*list(pretrainedmodels.se_resnext50_32x4d(pretrained=pretrained).children())[:cut_point])
 
             if self.config.num_slices != 3:
                 model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(7, 7),
                                            stride=(2, 2), padding=(3, 3), bias=False)
 
-            return model
-
-        if model == 'se_resnet50':
+        elif model == 'se_resnet50':
             cut_point = -2
-            pretrained = 'imagenet' if pretrained else None
             model = nn.Sequential(*list(pretrainedmodels.se_resnet50(pretrained=pretrained).children())[:cut_point])
 
             if self.config.num_slices != 3:
                 model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(7, 7),
                                            stride=(2, 2), padding=(3, 3), bias=False)
-            return model
+
+        model[0].conv1.weight.data.fill_(0.)
+        return model
 
     def __init__(self, config):
         super(Classifier2DC, self).__init__()
