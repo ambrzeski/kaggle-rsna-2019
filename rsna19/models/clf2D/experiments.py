@@ -28,6 +28,10 @@ class ModelInfo:
         self.batch_size = batch_size
 
 
+def _w(w, l):
+    return l-w/2, l+w/2
+
+
 MODELS = {
     'se_resnext50_gwap': ModelInfo(
         factory=model_2d.classification_model_se_resnext50_gwap,
@@ -127,6 +131,233 @@ MODELS = {
         args=dict(use_gwap=True, nb_windows_conv=64),
         dataset_args=dict(img_size=256, scale_values=1e-3),
         batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_256_16_window_0..100': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_windows_conv=32),
+        dataset_args=dict(img_size=256, apply_windows=[(0, 100)]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_256_16_window_-50..150': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_windows_conv=32),
+        dataset_args=dict(img_size=256, apply_windows=[(-50, 150)]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_256_16_window_-100..200': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_windows_conv=32),
+        dataset_args=dict(img_size=256, apply_windows=[(-100, 200)]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_256_16_window_0..50_20..100_-50..150': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_windows_conv=32, nb_input_planes=3),
+        dataset_args=dict(img_size=256, apply_windows=[(0, 50), (20, 100), (-50, 150)]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_256_32_window_set7': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_windows_conv=32, nb_input_planes=7),
+        dataset_args=dict(img_size=256, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'vgg16_256_window_0..50_20..100_-50..150': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_input_planes=3),
+        dataset_args=dict(img_size=256, apply_windows=[(0, 50), (20, 100), (-50, 150)]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'vgg16_256_window_set7': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_input_planes=7),
+        dataset_args=dict(img_size=256, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'vgg16_128_window_set7': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_input_planes=7),
+        dataset_args=dict(img_size=128, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'vgg16_512_window_set7': ModelInfo(  # it's resnet34, nott vgg!
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=True, nb_input_planes=7),
+        dataset_args=dict(img_size=512, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2
+    ),
+    'enet_b0_256_window_set7': ModelInfo(
+        factory=model_2d.classification_model_efficient_net_b0,
+        args=dict(use_gwap=True, nb_input_planes=7),
+        dataset_args=dict(img_size=256, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'now_vgg16_256_window_0..50_20..100_-50..150': ModelInfo(
+        factory=model_2d.classification_model_vgg,
+        args=dict(use_gwap=True, nb_input_planes=3),
+        dataset_args=dict(img_size=256, apply_windows=[(0, 50), (20, 100), (-50, 150)]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'now_vgg16_256_window_set7': ModelInfo(
+        factory=model_2d.classification_model_vgg,
+        args=dict(use_gwap=True, nb_input_planes=7),
+        dataset_args=dict(img_size=256, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'now_vgg16_128_window_set7': ModelInfo(
+        factory=model_2d.classification_model_vgg,
+        args=dict(use_gwap=True, nb_input_planes=7),
+        dataset_args=dict(img_size=128, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'now_vgg16_512_window_set7': ModelInfo(
+        factory=model_2d.classification_model_vgg,
+        args=dict(use_gwap=True, nb_input_planes=7),
+        dataset_args=dict(img_size=512, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2
+    ),
+    'dpn68_256_window_set7': ModelInfo(
+        factory=model_2d.classification_model_dpn68b,
+        args=dict(use_gwap=True, nb_input_planes=7, nb_windows_conv=16),
+        dataset_args=dict(img_size=512, apply_windows=[
+            _w(w=80, l=40),
+            _w(w=130, l=75),
+            _w(w=300, l=75),
+            _w(w=400, l=40),
+            _w(w=2800, l=600),
+            _w(w=8, l=32),
+            _w(w=40, l=40)
+        ]),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2
+    ),
+    'resnet34_512_crop_384_window_set7': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=False, nb_input_planes=7),
+        dataset_args=dict(
+            img_size=512,
+            center_crop=384,
+            apply_windows=[
+                _w(w=80, l=40),
+                _w(w=130, l=75),
+                _w(w=300, l=75),
+                _w(w=400, l=40),
+                _w(w=2800, l=600),
+                _w(w=8, l=32),
+                _w(w=40, l=40)
+            ]),
+        batch_size=64,
         optimiser='radam',
         initial_lr=1e-4,
         accumulation_steps=1

@@ -159,13 +159,16 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-500:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
     model.module.unfreeze_encoder()
 
-    for epoch_num in range(resume_epoch+1, 128):
+    for epoch_num in range(resume_epoch+1, 16):
         for phase in ['train', 'val']:
             model.train(phase == 'train')
             epoch_loss = []
             epoch_labels = []
             epoch_predictions = []
             epoch_sample_paths = []
+
+            if 'on_epoch' in model.module.__dir__():
+                model.module.on_epoch(epoch_num)
 
             data_loader = data_loaders[phase]
             data_iter = tqdm(enumerate(data_loader), total=len(data_loader))
@@ -203,17 +206,6 @@ def train(model_name, fold, run=None, resume_epoch=-1):
 
             if phase == 'val':
                 scheduler.step(epoch=epoch_num)
-
-                print(f'{checkpoints_dir}/{epoch_num:03}.pt')
-                torch.save(
-                    {
-                        'epoch': epoch_num,
-                        'model_state_dict': model.module.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                    },
-                    f'{checkpoints_dir}/{epoch_num:03}.pt'
-                )
-
                 torch.save(
                     {
                         'epoch': epoch_num,
@@ -222,6 +214,16 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                         'epoch_predictions': epoch_predictions,
                     },
                     f'{oof_dir}/{epoch_num:03}.pt'
+                )
+            else:
+                # print(f'{checkpoints_dir}/{epoch_num:03}.pt')
+                torch.save(
+                    {
+                        'epoch': epoch_num,
+                        'model_state_dict': model.module.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                    },
+                    f'{checkpoints_dir}/{epoch_num:03}.pt'
                 )
 
 
@@ -285,7 +287,7 @@ def check_windows(model_name, fold, epoch, run=None):
     model_str = build_model_str(model_name, fold, run)
     model_info = MODELS[model_name]
 
-    checkpoints_dir = f'{config.config.checkpoints_dir}/{model_str}'
+    checkpoints_dir = f'{BaseConfig.checkpoints_dir}/{model_str}'
     print('\n', model_name, '\n')
 
     model = model_info.factory(**model_info.args)
@@ -336,6 +338,46 @@ def check_windows(model_name, fold, epoch, run=None):
             plt.show()
 
 
+def check_score(model_name, fold, epoch, run=None):
+    import sklearn.metrics
+
+    model_str = build_model_str(model_name, fold, run)
+    model_info = MODELS[model_name]
+
+    oof_dir = f'{BaseConfig.oof_dir}/{model_str}'
+    print('\n', model_str, '\n')
+
+    pred = torch.load(f'{oof_dir}/{epoch:03}.pt')
+    epoch_labels = pred['epoch_labels']
+    epoch_predictions = pred['epoch_predictions']
+
+    def double_any(d):
+        return np.column_stack([d, d[:, -1:]])
+
+    print(sklearn.metrics.log_loss(double_any(epoch_labels).flatten(), double_any(epoch_predictions).flatten()))
+
+    class_weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 1.0, 2.0])
+    # return F.binary_cross_entropy_with_logits(y_pred, y_true, class_weights.repeat(y_pred.shape[0], 1))
+    print(F.binary_cross_entropy(torch.from_numpy((double_any(epoch_predictions)).flatten()),
+                                 torch.from_numpy((double_any(epoch_labels)).flatten())))
+
+    print(F.binary_cross_entropy(torch.from_numpy(epoch_predictions).reshape(-1),
+                                 torch.from_numpy(epoch_labels).reshape(-1),
+                                 class_weights.repeat(epoch_predictions.shape[0], 1).reshape(-1)
+                                 ))
+
+    print(F.binary_cross_entropy(torch.from_numpy(epoch_predictions),
+                                 torch.from_numpy(epoch_labels),
+                                 class_weights.repeat(epoch_predictions.shape[0], 1)
+                                 ))
+
+    clamp_values = np.arange(-8, -2.2, 0.1)
+    loss = [sklearn.metrics.log_loss(double_any(epoch_labels).flatten(), double_any(epoch_predictions).flatten(), eps=18**c) for c in clamp_values]
+    plt.plot(clamp_values, loss)
+    print(min(loss))
+    plt.show()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action', type=str, default='check')
@@ -362,3 +404,6 @@ if __name__ == '__main__':
 
     if action == 'check_windows':
         check_windows(model_name=args.model, run=args.run, fold=args.fold, epoch=args.epoch)
+
+    if action == 'check_score':
+        check_score(model_name=args.model, run=args.run, fold=args.fold, epoch=args.epoch)
