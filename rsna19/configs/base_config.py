@@ -8,6 +8,7 @@ class BaseConfig:
     checkpoints_dir = "../output/checkpoints"
     tensorboard_dir = "../output/tensorboard"
     oof_dir = "../output/oof"
+    prediction_dir = "/home/dmytro/ml/kaggle-rsna-2019/output/prediction"
 
     n_classes = 6
     csv_root_dir = None

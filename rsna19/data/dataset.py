@@ -5,7 +5,7 @@ import pandas as pd
 import cv2
 import torch
 from torch.utils.data import Dataset
-
+from preprocessing import hu_converter
 from rsna19.configs.base_config import BaseConfig
 
 
@@ -13,12 +13,14 @@ class IntracranialDataset(Dataset):
     def __init__(self,
                  csv_file,
                  folds,
+                 is_test=False,
                  csv_root_dir=None,
                  return_labels=True,
                  preprocess_func=None,
                  img_size=512,
                  center_crop=-1,
                  scale_values=1.0,
+                 convert_cdf=False,
                  apply_windows=None
                  ):
         """
@@ -29,24 +31,29 @@ class IntracranialDataset(Dataset):
         :param preprocess_func: preprocessing function, e.g. for window adjustment
         """
 
+        self.convert_cdf = convert_cdf
         self.center_crop = center_crop
         self.apply_windows = apply_windows
         self.return_labels = return_labels
         self.preprocess_func = preprocess_func
         self.img_size = img_size
         self.scale_values = scale_values  # scale all images data to values around 1
+        self.is_test = is_test
 
         if csv_root_dir is None:
             csv_root_dir = os.path.normpath(__file__ + '/../csv')
 
-        if 'test' in csv_file:
+        if is_test:
             centers_csv_file = os.path.join(csv_root_dir, 'test_centers.csv')
         else:
             centers_csv_file = os.path.join(csv_root_dir, 'train_centers.csv')
+
         self.centers_data = pd.read_csv(centers_csv_file).set_index('study_id', drop=True)
+        self.hu_converter = hu_converter.HuConverter
 
         data = pd.read_csv(os.path.join(csv_root_dir, csv_file))
-        data = data[data.fold.isin(folds)]
+        if not is_test:
+            data = data[data.fold.isin(folds)]
         data = data.reset_index()
         self.data = data
 
@@ -55,6 +62,8 @@ class IntracranialDataset(Dataset):
 
     def __getitem__(self, idx):
         data_path = self.data.loc[idx, 'path']
+        study_id = data_path.split('/')[2]
+        slice_num = os.path.basename(data_path).split('.')[0]
         img_path = os.path.normpath(os.path.join(BaseConfig.data_root, '..', data_path))
         img = np.load(img_path).astype(np.float) * self.scale_values
 
@@ -68,6 +77,9 @@ class IntracranialDataset(Dataset):
             from_col = int(np.clip(center_col - self.center_crop // 2, 0, self.img_size - self.center_crop))
 
             img = img[from_row:from_row + self.center_crop, from_col:from_col + self.center_crop]
+
+        if self.convert_cdf:
+            img = self.hu_converter.convert(img, use_cdf=True)
 
         img = img[:, :, None]
 
@@ -97,6 +109,8 @@ class IntracranialDataset(Dataset):
             'idx': idx,
             'image': img,
             'path': data_path,
+            'study_id': study_id,
+            'slice_num': slice_num
         }
 
         if self.return_labels:
@@ -123,15 +137,16 @@ if __name__ == '__main__':
     ds = IntracranialDataset(csv_file='5fold.csv', folds=[0],
                              img_size=512,
                              center_crop=384,
-                             apply_windows=[
-                                _w(w=80, l=40),
-                                _w(w=130, l=75),
-                                _w(w=300, l=75),
-                                _w(w=400, l=40),
-                                _w(w=2800, l=600),
-                                _w(w=8, l=32),
-                                _w(w=40, l=40)
-                             ],
+                             # apply_windows=[
+                             #    _w(w=80, l=40),
+                             #    _w(w=130, l=75),
+                             #    _w(w=300, l=75),
+                             #    _w(w=400, l=40),
+                             #    _w(w=2800, l=600),
+                             #    _w(w=8, l=32),
+                             #    _w(w=40, l=40)
+                             # ],
+                             convert_cdf=True,
                              preprocess_func=albumentations.Compose([
                                  # albumentations.ShiftScaleRotate(
                                  #     shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
@@ -144,6 +159,6 @@ if __name__ == '__main__':
     sample = ds[0]
     img = sample['image']  # .detach().numpy()
     print(sample['labels'], img.shape, img.min(), img.max())
-    for i in range(7):
+    for i in range(img.shape[0]):
         plt.imshow(img[i], cmap='gray')
         plt.show()

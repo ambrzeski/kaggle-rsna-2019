@@ -371,11 +371,27 @@ def check_score(model_name, fold, epoch, run=None):
                                  class_weights.repeat(epoch_predictions.shape[0], 1)
                                  ))
 
-    clamp_values = np.arange(-8, -2.2, 0.1)
-    loss = [sklearn.metrics.log_loss(double_any(epoch_labels).flatten(), double_any(epoch_predictions).flatten(), eps=18**c) for c in clamp_values]
-    plt.plot(clamp_values, loss)
-    print(min(loss))
+    loss = F.binary_cross_entropy(
+        torch.from_numpy(epoch_predictions),
+        torch.from_numpy(epoch_labels),
+        class_weights.repeat(epoch_predictions.shape[0], 1),
+        reduction='none')
+
+    print(loss.shape)
+    loss = loss.cpu().detach().numpy()
+    loss = np.mean(loss, axis=1)
+
+    # plt.hist(loss, bins=1024)
+    plt.plot(np.sort(-1*loss)*-1)
+    plt.axvline()
+    plt.axhline()
     plt.show()
+
+    # clamp_values = np.arange(-8, -2.2, 0.1)
+    # loss = [sklearn.metrics.log_loss(double_any(epoch_labels).flatten(), double_any(epoch_predictions).flatten(), eps=18**c) for c in clamp_values]
+    # plt.plot(clamp_values, loss)
+    # print(min(loss))
+    # plt.show()
 
 
 if __name__ == '__main__':
