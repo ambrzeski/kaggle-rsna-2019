@@ -1,8 +1,9 @@
+import numpy as np
 import os
 import pandas as pd
 
 
-def generate_submission(prediction_paths, out_path):
+def generate_submission(prediction_paths, out_path, clip_eps=0):
     """
     Generate submission file by averaging predictions from multiple models read from csv files.
     Each csv file should contain predictions on test set from different model and must have following columns:
@@ -10,6 +11,7 @@ def generate_submission(prediction_paths, out_path):
 
     :param prediction_paths: path to csv files with predictions
     :param out_path: destination path of csv submission file
+    :param clip_eps: eps used for clipping predictions to (eps, 1-eps) range
     """
 
     id_map_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "csv/id_map.csv")
@@ -27,6 +29,8 @@ def generate_submission(prediction_paths, out_path):
         class_dfs.append(df)
 
     submission_df = pd.concat(class_dfs).sort_values(by='ID')
+    if clip_eps > 0:
+        submission_df.Label = np.clip(submission_df.Label, clip_eps, 1 - clip_eps)
     submission_df.to_csv(out_path, index=False, float_format='%.6f')
 
 
@@ -34,6 +38,13 @@ if __name__ == '__main__':
     prediction_paths = [
         '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_2_3/results/_ckpt_epoch_3_test.csv',
         '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_2_4/results/_ckpt_epoch_3_test.csv',
+        '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_3_4/results/_ckpt_epoch_3_test.csv',
+        '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_2_3_4/results/_ckpt_epoch_4_test.csv',
+        '/kolos/m2/ct/models/classification/rsna/0009_regularization/1_2_3_4/results/_ckpt_epoch_3_test.csv',
+        # '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_3/results/_ckpt_epoch_2_test.csv',
+        # '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_4/results/_ckpt_epoch_2_test.csv',
+        # '/kolos/m2/ct/models/classification/rsna/0007_window1/0_1_2_3/results/_ckpt_epoch_2_test.csv',
+        # '/kolos/m2/ct/models/classification/rsna/0008_window2/0_1_2_3/results/_ckpt_epoch_2_test.csv'
     ]
-    out_path = '/kolos/m2/ct/data/rsna/submissions/submission1.csv'
-    generate_submission(prediction_paths, out_path)
+    out_path = '/kolos/m2/ct/data/rsna/submissions/submission8.csv'
+    generate_submission(prediction_paths, out_path, 10**3.76)
