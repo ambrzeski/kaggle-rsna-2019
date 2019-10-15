@@ -362,4 +362,40 @@ MODELS = {
         initial_lr=1e-4,
         accumulation_steps=1
     ),
+    'resnet34_512_crop_384_cdf': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=False, nb_input_planes=1),
+        dataset_args=dict(
+            img_size=512,
+            center_crop=384,
+            convert_cdf=True),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnext50_512_crop_384_cdf_no_bn2': ModelInfo(
+        factory=model_2d.classification_model_se_resnext50,
+        args=dict(use_gwap=False, nb_input_planes=1, add_bn2=False),
+        dataset_args=dict(
+            img_size=512,
+            center_crop=384,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=4
+    ),
+    'resnext50_512_crop_384_cdf': ModelInfo(
+        factory=model_2d.classification_model_se_resnext50,
+        args=dict(use_gwap=False, nb_input_planes=1, add_bn2=True),
+        dataset_args=dict(
+            img_size=512,
+            center_crop=384,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=4
+    ),
 }
