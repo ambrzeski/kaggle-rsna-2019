@@ -6,6 +6,7 @@ from sklearn.metrics import log_loss
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 import numpy as np
+from copy import deepcopy
 
 from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.commons.balancing_sampler import BalancedBatchSampler
@@ -30,6 +31,7 @@ class Classifier2DC(pl.LightningModule):
             model = nn.Sequential(*list(pretrainedmodels.senet154(pretrained=pretrained).children())[:cut_point])
 
             if self.config.num_slices != 3:
+                tmp = deepcopy(model[0].conv1.weight)
                 model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(3, 3),
                                            stride=(2, 2), padding=(1, 1), bias=False)
 
@@ -38,6 +40,7 @@ class Classifier2DC(pl.LightningModule):
             model = nn.Sequential(*list(pretrainedmodels.se_resnext50_32x4d(pretrained=pretrained).children())[:cut_point])
 
             if self.config.num_slices != 3:
+                tmp = deepcopy(model[0].conv1.weight)
                 model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(7, 7),
                                            stride=(2, 2), padding=(3, 3), bias=False)
 
@@ -46,11 +49,15 @@ class Classifier2DC(pl.LightningModule):
             model = nn.Sequential(*list(pretrainedmodels.se_resnet50(pretrained=pretrained).children())[:cut_point])
 
             if self.config.num_slices != 3:
+                tmp = deepcopy(model[0].conv1.weight)
                 model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(7, 7),
                                            stride=(2, 2), padding=(3, 3), bias=False)
 
         if self.config.num_slices != 3:
+            diff = (self.config.num_slices - 3) // 2
+
             model[0].conv1.weight.data.fill_(0.)
+            model[0].conv1.weight[:, diff:diff+3, :, :].data.copy_(tmp)
 
         return model
 
