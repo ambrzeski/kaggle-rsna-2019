@@ -241,10 +241,10 @@ def crop_scan(scan, dest_shape):
 
     return scan_cropped
 
-z, x, y = [], [], []
-non_zero_start = []
-failed_paths = []
-all_paths = []
+# z, x, y = [], [], []
+# non_zero_start = []
+# failed_paths = []
+# all_paths = []
 
 
 def process_scan(scan_dir):
