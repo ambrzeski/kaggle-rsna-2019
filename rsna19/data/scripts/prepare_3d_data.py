@@ -18,7 +18,7 @@ import tqdm
 from rsna19.configs.base_config import BaseConfig
 
 ShearParams = namedtuple('ShearParams', 'rad_tilt, minus_center_z')
-OUT_SIZE = (384, 384)
+OUT_SIZE = (400, 400)
 BG_HU = -2000
 
 
