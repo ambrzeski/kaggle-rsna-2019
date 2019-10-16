@@ -1,7 +1,8 @@
 """ Load dicom files using vtk package """
+import shutil
 
 import os
-from glob import iglob
+from glob import iglob, glob
 from math import atan
 from collections import namedtuple
 import traceback
@@ -10,13 +11,13 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import pandas as pd
 import numpy as np
 import vtk
+from scipy import ndimage
 from vtk import vtkImageCast, vtkImageResample, vtkDICOMImageReader
 from vtk.util.numpy_support import vtk_to_numpy
 import cv2
 import tqdm
 
 from rsna19.preprocessing.hu_converter import HuConverter
-
 
 ShearParams = namedtuple('ShearParams', 'rad_tilt, minus_center_z')
 
@@ -38,11 +39,11 @@ class VtkImage:
         self.reader.Update()
 
         # prepare parameters for shear transform (gantry tilt)
-        x1, y1, z1, x2, y2, z2 = self.reader.GetImageOrientationPatient()
+        x1, y1, z1, x2, y2, z2 = image_orientation = self.reader.GetImageOrientationPatient()
 
         # if non-standard orientation, then it's non-standard series
-        if y2 == 0 or (x1, y1, z1) != (1, 0, 0):
-            raise Exception("Wrong patient orientation")
+        if y2 == 0:
+            raise Exception(f"Wrong patient orientation: {image_orientation}")
 
         rad_tilt = atan(z2 / y2)
         center_z = self.reader.GetOutput().GetBounds()[5] / 2
@@ -150,7 +151,8 @@ class VtkImage:
 
         return array, spacing, self.shear_params
 
-    def get_slices_clamped(self, margin=(40, 40, 40), dtype=np.float32):
+    def get_slices_clamped(self, margin=(40, 40, 40), dtype=np.float32, max_slices_without_bones=4,
+                           hu_thresholds=(800, -500)):
         """Function that returns image clamped to skull + given margin, if margin is not air"""
         array, spacings, _ = self.get_slices(dtype)
 
@@ -163,7 +165,6 @@ class VtkImage:
         orig_shape = array.shape
         cut_margin = np.zeros(6)
 
-        hu_thresholds = [800, -500]
         margins = [margin, (1, 1, 1)]
         for hu_threshold, add_margin in zip(hu_thresholds, margins):
             drop_list = []
@@ -172,11 +173,11 @@ class VtkImage:
                 array = array.transpose((2, 0, 1))
 
             # real margin equals margin + max_slices_without_bones
-            max_slices_without_bones = 4
             sl = []
             for idx, plane in enumerate(drop_list):
                 idx_with_bones = np.where(plane == False)[0]
-                center = (idx_with_bones[0] + idx_with_bones[-1]) // 2 if len(idx_with_bones) > 0 else plane.shape[0] // 2
+                center = (idx_with_bones[0] + idx_with_bones[-1]) // 2 if len(idx_with_bones) > 0 else plane.shape[
+                                                                                                           0] // 2
                 counter = 0
                 for i in range(center, 0, -1):
                     if plane[i]:
@@ -197,7 +198,8 @@ class VtkImage:
                     else:
                         counter = 0
                     if counter >= max_slices_without_bones:
-                        cut_plane_idx = i + add_margin[idx] if i + add_margin[idx] <= plane.shape[0] else plane.shape[0] - 1
+                        cut_plane_idx = i + add_margin[idx] if i + add_margin[idx] <= plane.shape[0] else plane.shape[
+                                                                                                              0] - 1
                         sl.append(cut_plane_idx)
                         break
                 else:
@@ -220,6 +222,24 @@ class VtkImage:
         return array, spacings, self.shear_params, cut_margin
 
 
+def crop_scan(scan, dest_shape):
+    dest_shape = np.array(dest_shape)
+    _, y, x = ndimage.measurements.center_of_mass(scan > 0)
+    center = np.array([y, x], dtype=np.int32)
+    corner0 = center - dest_shape // 2
+    corner1 = corner0 + dest_shape
+
+    corner0_clipped = np.maximum(corner0, 0)
+    corner1_clipped = np.minimum(corner1, scan.shape[1:])
+    margin0 = np.abs(corner0 - corner0_clipped)
+    margin1 = np.abs(corner1 - corner1_clipped)
+
+    scan_cropped = np.zeros((scan.shape[0], dest_shape[0], dest_shape[1]), dtype=np.int16) - 2000
+    crop = scan[:, corner0_clipped[0]:corner1_clipped[0], corner0_clipped[1]:corner1_clipped[1]]
+    scan_cropped[:, margin0[0]:dest_shape[0] - margin1[0], margin0[1]:dest_shape[1] - margin1[1]] = crop
+
+    return scan_cropped
+
 z, x, y = [], [], []
 non_zero_start = []
 failed_paths = []
@@ -229,42 +249,50 @@ all_paths = []
 def process_scan(scan_dir):
     try:
         out_dir = scan_dir.replace('dicom/', '3d/')
+        shutil.rmtree(out_dir, ignore_errors=True)
         os.makedirs(out_dir, exist_ok=True)
 
-        out_npy, _, shear_params, margin = VtkImage(scan_dir, spacing='none').get_slices_clamped(margin=(0, 20, 20))
-        z.append(out_npy.shape[0])
-        x.append(out_npy.shape[1])
-        y.append(out_npy.shape[2])
-        all_paths.append(scan_dir)
+        # out_npy, _, shear_params, margin = VtkImage(scan_dir, spacing='none').get_slices_clamped(margin=(0, 20, 20))
+        # z.append(out_npy.shape[0])
+        # x.append(out_npy.shape[1])
+        # y.append(out_npy.shape[2])
+        out_npy = VtkImage(scan_dir, spacing='none').get_slices()[0]
+        out_npy = crop_scan(out_npy, (384, 384))
+        # all_paths.append(scan_dir)
 
         # out_npy = HuConverter.convert(out_npy)
         # out_npy = ((out_npy + 1)/2)*255
 
-        if margin[0] > 0:
-            non_zero_start.append(scan_dir)
+        # if margin[0] > 0:
+        #     non_zero_start.append(scan_dir)
 
         for idx, scan_slice in enumerate(out_npy):
             # cv2.imwrite(f'{out_dir}{int(idx + margin[0]):03d}.png', scan_slice)
-            np.save(f'{out_dir}{int(idx + margin[0]):03d}.npy', scan_slice.astype(np.int16))
-    except:
+            # np.save(f'{out_dir}{int(idx + margin[0]):03d}.npy', scan_slice.astype(np.int16))
+            np.save(f'{out_dir}{idx:03d}.npy', scan_slice.astype(np.int16))
+    except Exception:
         traceback.print_exc()
-        failed_paths.append(scan_dir)
+        print(scan_dir)
+        # failed_paths.append(scan_dir)
 
 
 def main():
-    # with ProcessPoolExecutor(max_workers=16) as executor:
-    for path in tqdm.tqdm(iglob('/kolos/m2/ct/data/rsna/train/*/dicom/')):
-        process_scan(path)
+    with ProcessPoolExecutor(max_workers=16) as executor:
+        paths = glob('/kolos/m2/ct/data/rsna/train/*/dicom/') + glob('/kolos/m2/ct/data/rsna/test/*/dicom/')
+        list(tqdm.tqdm(executor.map(process_scan, paths), total=len(paths)))
+        # for path in tqdm.tqdm(glob('/kolos/m2/ct/data/rsna/train/*/dicom/') + glob('/kolos/m2/ct/data/rsna/test/*/dicom/')):
+            # process_scan(path)
             # path = '/kolos/m2/ct/data/rsna/train/ID_0a070a2bea/dicom/'
             # executor.submit(process_scan, path)
 
+
     # scan_dir = '/kolos/m2/ct/data/rsna/train/ID_0a070a2bea/dicom/'
 
-    df = pd.DataFrame.from_dict({'z': z, 'x': x, 'y': y, 'scan_dir': all_paths})
-    print('non_zero_start: ', non_zero_start)
+    # df = pd.DataFrame.from_dict({'z': z, 'x': x, 'y': y, 'scan_dir': all_paths})
+    # print('non_zero_start: ', non_zero_start)
     print('failed_paths: ', failed_paths)
-    print(df.describe(percentiles=[0.0001, 0.001, 0.01, 0.02, 0.1, 0.2, 0.5, 0.7, 0.8, 0.9, 0.95, 0.97, 0.99]))
-    df.to_csv('size_df.csv', index=False)
+    # print(df.describe(percentiles=[0.0001, 0.001, 0.01, 0.02, 0.1, 0.2, 0.5, 0.7, 0.8, 0.9, 0.95, 0.97, 0.99]))
+    # df.to_csv('size_df.csv', index=False)
 
 
 if __name__ == '__main__':
