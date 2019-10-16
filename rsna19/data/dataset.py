@@ -1,7 +1,9 @@
+import math
 import os
 
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import cv2
 import torch
 from torch.utils.data import Dataset
@@ -10,6 +12,8 @@ from rsna19.configs.base_config import BaseConfig
 
 
 class IntracranialDataset(Dataset):
+    _HU_AIR = -1000
+
     def __init__(self,
                  csv_file,
                  folds,
@@ -20,6 +24,7 @@ class IntracranialDataset(Dataset):
                  img_size=512,
                  center_crop=-1,
                  scale_values=1.0,
+                 num_slices=1,
                  convert_cdf=False,
                  apply_windows=None
                  ):
@@ -31,6 +36,7 @@ class IntracranialDataset(Dataset):
         :param preprocess_func: preprocessing function, e.g. for window adjustment
         """
 
+        self.num_slices = num_slices
         self.convert_cdf = convert_cdf
         self.center_crop = center_crop
         self.apply_windows = apply_windows
@@ -62,30 +68,54 @@ class IntracranialDataset(Dataset):
 
     def __getitem__(self, idx):
         data_path = self.data.loc[idx, 'path']
-        study_id = data_path.split('/')[2]
-        slice_num = os.path.basename(data_path).split('.')[0]
-        img_path = os.path.normpath(os.path.join(BaseConfig.data_root, '..', data_path))
-        img = np.load(img_path).astype(np.float) * self.scale_values
+        study_id = data_path.split('/')[-3]
+        slice_num = int(os.path.basename(data_path).split('.')[0])
+        full_path = os.path.normpath(os.path.join(BaseConfig.data_root, '..', data_path))
+        middle_img_path = Path(full_path)
 
-        if img.shape != (self.img_size, self.img_size):
-            img = cv2.resize(img, (self.img_size, self.img_size), cv2.INTER_AREA)
+        def load_img(cur_slice_num):
+            try:
+                img_path = middle_img_path.parent.joinpath('{:03d}.npy'.format(cur_slice_num))
+                img = np.load(img_path).astype(np.float) * self.scale_values
+            except FileNotFoundError:
+                img = np.full((self.img_size, self.img_size), self._HU_AIR, dtype=np.float)
 
-        if self.center_crop > 0:
-            study_id = data_path.split('/')[-3]
-            center_row, center_col = self.centers_data.loc[study_id, ['center_row', 'center_col']]
-            from_row = int(np.clip(center_row - self.center_crop // 2, 0, self.img_size - self.center_crop))
-            from_col = int(np.clip(center_col - self.center_crop // 2, 0, self.img_size - self.center_crop))
+            if img.shape != (self.img_size, self.img_size):
+                img = cv2.resize(img, (self.img_size, self.img_size), cv2.INTER_AREA)
 
-            img = img[from_row:from_row + self.center_crop, from_col:from_col + self.center_crop]
+            if self.center_crop > 0:
+                center_row, center_col = self.centers_data.loc[study_id, ['center_row', 'center_col']]
+                from_row = int(np.clip(center_row - self.center_crop // 2, 0, self.img_size - self.center_crop))
+                from_col = int(np.clip(center_col - self.center_crop // 2, 0, self.img_size - self.center_crop))
 
-        if self.convert_cdf:
-            img = self.hu_converter.convert(img, use_cdf=True)
+                img = img[from_row:from_row + self.center_crop, from_col:from_col + self.center_crop]
 
-        img = img[:, :, None]
+            if self.convert_cdf:
+                img = self.hu_converter.convert(img, use_cdf=True)
+
+            img = img[:, :, None]
+
+            return img
+
+        if self.num_slices == 1:
+            img = load_img(slice_num)
+        else:
+            steps = int(math.floor(self.num_slices/2.0))
+            img = np.concatenate(
+                [load_img(slice) for slice in range(slice_num - steps, slice_num + steps + 1)],
+                axis=2
+            )
 
         if self.preprocess_func:
-            processed = self.preprocess_func(image=img)
-            img = processed['image']
+            if self.num_slices == 5:
+                img = np.concatenate([img,
+                                      np.full((self.img_size, self.img_size, 1), self._HU_AIR, dtype=np.float)], axis=2)
+                processed = self.preprocess_func(image=img)
+                img = processed['image'][:-1, :, :]
+            else:
+                processed = self.preprocess_func(image=img)
+                img = processed['image']
+
 
         if self.apply_windows is not None:
             if isinstance(img, torch.Tensor):
@@ -134,25 +164,17 @@ if __name__ == '__main__':
     def _w(w, l):
         return l - w / 2, l + w / 2
 
-    ds = IntracranialDataset(csv_file='5fold.csv', folds=[0],
+    ds = IntracranialDataset(csv_file='5fold.csv', folds=[1],
                              img_size=512,
-                             center_crop=384,
-                             # apply_windows=[
-                             #    _w(w=80, l=40),
-                             #    _w(w=130, l=75),
-                             #    _w(w=300, l=75),
-                             #    _w(w=400, l=40),
-                             #    _w(w=2800, l=600),
-                             #    _w(w=8, l=32),
-                             #    _w(w=40, l=40)
-                             # ],
+                             # center_crop=384,
                              convert_cdf=True,
+                             num_slices=5,
                              preprocess_func=albumentations.Compose([
-                                 # albumentations.ShiftScaleRotate(
-                                 #     shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
-                                 #     interpolation=cv2.INTER_LINEAR,
-                                 #     border_mode=cv2.BORDER_REPLICATE,
-                                 #     p=0.99),
+                                 albumentations.ShiftScaleRotate(
+                                     shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
+                                     interpolation=cv2.INTER_LINEAR,
+                                     border_mode=cv2.BORDER_REPLICATE,
+                                     p=0.99),
                                  albumentations.pytorch.ToTensorV2()
                              ]),
                              )

@@ -1,4 +1,4 @@
-from rsna19.models.clf2D import model_2d
+from rsna19.models.clf2D import model_2d, model_2dc
 
 
 class ModelInfo:
@@ -7,6 +7,7 @@ class ModelInfo:
                  args,
                  dataset_args,
                  batch_size,
+                 nb_slices=1,
                  optimiser='sgd',
                  scheduler='steps',
                  initial_lr=1e-3,
@@ -15,6 +16,7 @@ class ModelInfo:
                  weight_decay=0,
                  is_pretrained=True,
                  ):
+        self.nb_slices = nb_slices
         self.is_pretrained = is_pretrained
         self.weight_decay = weight_decay
         self.accumulation_steps = accumulation_steps
@@ -397,5 +399,41 @@ MODELS = {
         optimiser='radam',
         initial_lr=1e-4,
         accumulation_steps=4
+    ),
+    'resnet34_256_cdf_5_planes_combine_last': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=256,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2
+    ),
+    'resnet34_256_cdf_5_planes_combine_first': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_first,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=256,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_256_cdf_1_plane': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_first,
+        args=dict(nb_input_slices=1),
+        dataset_args=dict(
+            img_size=256,
+            num_slices=1,
+            convert_cdf=True),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
     ),
 }

@@ -119,6 +119,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     data_loaders = {
         'train': DataLoader(dataset_train,
                             num_workers=16,
+                            shuffle=True,
                             batch_size=model_info.batch_size),
         'val':   DataLoader(dataset_valid,
                             shuffle=False,
@@ -159,7 +160,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-500:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
     model.module.unfreeze_encoder()
 
-    for epoch_num in range(resume_epoch+1, 16):
+    for epoch_num in range(resume_epoch+1, 10):
         for phase in ['train', 'val']:
             model.train(phase == 'train')
             epoch_loss = []
