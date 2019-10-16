@@ -7,6 +7,7 @@ from math import atan
 from collections import namedtuple
 import traceback
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from pathlib import Path
 
 import numpy as np
 import vtk
@@ -16,10 +17,13 @@ from vtk.util.numpy_support import vtk_to_numpy
 import tqdm
 
 from rsna19.configs.base_config import BaseConfig
+from rsna19.preprocessing.pydicom_loader import PydicomLoader
 
 ShearParams = namedtuple('ShearParams', 'rad_tilt, minus_center_z')
 OUT_SIZE = (400, 400)
 BG_HU = -2000
+
+loader = PydicomLoader()
 
 
 class VtkImage:
@@ -172,11 +176,11 @@ def crop_scan(scan, dest_shape):
 
 
 def process_scan(scan_dir):
-    try:
-        out_dir = scan_dir.replace('dicom/', '3d/')
-        shutil.rmtree(out_dir, ignore_errors=True)
-        os.makedirs(out_dir, exist_ok=True)
+    out_dir = scan_dir.replace('dicom/', '3d/')
+    shutil.rmtree(out_dir, ignore_errors=True)
+    os.makedirs(out_dir, exist_ok=True)
 
+    try:
         out_npy = VtkImage(scan_dir, spacing='none').get_slices()[0]
         out_npy = crop_scan(out_npy, OUT_SIZE)
 
@@ -184,6 +188,18 @@ def process_scan(scan_dir):
             np.save(f'{out_dir}{idx:03d}.npy', scan_slice.astype(np.int16))
 
     except Exception:
+
+        exam_root = Path(scan_dir)
+        slices = []
+        for slice_path in exam_root.iterdir():
+            slices.append(loader.load(str(slice_path), convert_hu=False))
+
+        scan = np.stack(slices)
+        scan_cropped = crop_scan(scan, OUT_SIZE)
+
+        for idx, scan_slice in enumerate(scan_cropped):
+            np.save(f'{out_dir}{idx:03d}.npy', scan_slice.astype(np.int16))
+
         traceback.print_exc()
         print(scan_dir)
 
@@ -191,6 +207,14 @@ def process_scan(scan_dir):
 def main():
     with ProcessPoolExecutor(max_workers=16) as executor:
         paths = glob(f'{BaseConfig.data_root}/train/*/dicom/') + glob(f'{BaseConfig.data_root}/test/*/dicom/')
+        # paths = ['/kolos/m2/ct/data/rsna/train/ID_0dc7645c14/dicom/',
+        #          '/kolos/m2/ct/data/rsna/train/ID_fcc85d6ebc/dicom/',
+        #          '/kolos/m2/ct/data/rsna/test/ID_be88c23b42/dicom/',
+        #          '/kolos/m2/ct/data/rsna/train/ID_99e4e009da/dicom/',
+        #          '/kolos/m2/ct/data/rsna/train/ID_f03b07e5e4/dicom/',
+        #          '/kolos/m2/ct/data/rsna/train/ID_c9a49565ec/dicom/',
+        #          '/kolos/m2/ct/data/rsna/train/ID_3bb2b2176b/dicom/',
+        #          '/kolos/m2/ct/data/rsna/test/ID_a06f6350dc/dicom/']
         list(tqdm.tqdm(executor.map(process_scan, paths), total=len(paths)))
 
 
