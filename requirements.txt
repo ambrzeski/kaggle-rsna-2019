@@ -12,3 +12,4 @@ future
 albumentations
 matplotlib
 pretrainedmodels
+vtk
