@@ -18,6 +18,7 @@ import cv2
 import tqdm
 
 from rsna19.preprocessing.hu_converter import HuConverter
+from rsna19.configs.base_config import BaseConfig
 
 ShearParams = namedtuple('ShearParams', 'rad_tilt, minus_center_z')
 
@@ -278,7 +279,7 @@ def process_scan(scan_dir):
 
 def main():
     with ProcessPoolExecutor(max_workers=16) as executor:
-        paths = glob('/kolos/m2/ct/data/rsna/train/*/dicom/') + glob('/kolos/m2/ct/data/rsna/test/*/dicom/')
+        paths = glob(f'{BaseConfig.data_root}/train/*/dicom/') + glob(f'{BaseConfig.data_root}/test/*/dicom/')
         list(tqdm.tqdm(executor.map(process_scan, paths), total=len(paths)))
         # for path in tqdm.tqdm(glob('/kolos/m2/ct/data/rsna/train/*/dicom/') + glob('/kolos/m2/ct/data/rsna/test/*/dicom/')):
             # process_scan(path)
@@ -290,7 +291,7 @@ def main():
 
     # df = pd.DataFrame.from_dict({'z': z, 'x': x, 'y': y, 'scan_dir': all_paths})
     # print('non_zero_start: ', non_zero_start)
-    print('failed_paths: ', failed_paths)
+    # print('failed_paths: ', failed_paths)
     # print(df.describe(percentiles=[0.0001, 0.001, 0.01, 0.02, 0.1, 0.2, 0.5, 0.7, 0.8, 0.9, 0.95, 0.97, 0.99]))
     # df.to_csv('size_df.csv', index=False)
 
