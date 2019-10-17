@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import albumentations
+import albumentations.pytorch
 import cv2
 
 from rsna19.data.utils import normalize_train
@@ -49,23 +50,22 @@ class IntracranialDataset(Dataset):
         path = os.path.normpath(os.path.join(self.config.data_root, '..', path))
 
         # todo it would be better to have generic paths in csv and parameter specifying which data version to use
-        if self.config.slice_size == 256:
-            path = path.replace('npy/', 'npy256/')
+        path = path.replace('npy/', self.config.data_version + '/')
 
         middle_img_path = Path(path)
 
         middle_img_num = int(middle_img_path.stem)
-        slices_image = np.zeros((self.config.num_slices, self.config.slice_size, self.config.slice_size))
+        slices_image = np.zeros((self.config.num_slices, self.config.pre_crop_size, self.config.pre_crop_size))
         for slice_idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
                                                   middle_img_num + self.config.num_slices // 2 + 1)):
 
             if img_num < 0 or img_num > (len(os.listdir(middle_img_path.parent)) - 1):
-                slice_img = np.full((self.config.slice_size, self.config.slice_size), self._HU_AIR)
+                slice_img = np.full((self.config.pre_crop_size, self.config.pre_crop_size), self._HU_AIR)
             else:
                 slice_img = np.load(middle_img_path.parent.joinpath('{:03d}.npy'.format(img_num)))
 
-            if slice_img.shape != (self.config.slice_size, self.config.slice_size):
-                slice_img = cv2.resize(np.int16(slice_img), (self.config.slice_size, self.config.slice_size),
+            if slice_img.shape != (self.config.pre_crop_size, self.config.pre_crop_size):
+                slice_img = cv2.resize(np.int16(slice_img), (self.config.pre_crop_size, self.config.pre_crop_size),
                                        interpolation=cv2.INTER_AREA)
 
             slices_image[slice_idx] = slice_img
@@ -77,18 +77,28 @@ class IntracranialDataset(Dataset):
                                            self.config.min_hu_value,
                                            self.config.max_hu_value)
 
+        slices_image = slices_image.transpose((1, 2, 0))
+
+        transforms = []
         if self.augment:
-            augmentations = albumentations.Compose([
-                albumentations.ShiftScaleRotate(
-                    shift_limit=24. / 256, scale_limit=0.15, rotate_limit=30,
+            transforms.append(albumentations.ShiftScaleRotate(
+                    shift_limit=0, scale_limit=0.15, rotate_limit=30,
                     interpolation=cv2.INTER_LINEAR,
                     border_mode=cv2.BORDER_REPLICATE,
-                    p=0.8),
-            ])
-            processed = augmentations(image=slices_image)
-            slices_image = processed['image']
+                    p=0.8))
+            transforms.append(albumentations.HorizontalFlip(p=0.5))
 
-        img = torch.tensor(slices_image, dtype=torch.float32)
+        if self.config.random_crop:
+            transforms.append(albumentations.RandomCrop(self.config.crop_size, self.config.crop_size))
+        else:
+            transforms.append(albumentations.CenterCrop(self.config.crop_size, self.config.crop_size))
+
+        transforms.append(albumentations.pytorch.ToTensorV2())
+
+        processed = albumentations.Compose(transforms)(image=slices_image)
+        img = processed['image']
+
+        # img = torch.tensor(slices_image, dtype=torch.float32)
 
         out = {
             'image': img,
