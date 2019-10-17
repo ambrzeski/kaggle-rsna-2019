@@ -1,4 +1,3 @@
-import pretrainedmodels
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
@@ -12,6 +11,8 @@ from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.commons.balancing_sampler import BalancedBatchSampler
 import rsna19.models.commons.metrics as metrics
 from rsna19.models.commons.radam import RAdam
+from rsna19.models.commons.concat_pool import concat_pool
+from rsna19.models.commons.get_base_model import get_base_model
 
 
 class Classifier2DC(pl.LightningModule):
@@ -19,49 +20,37 @@ class Classifier2DC(pl.LightningModule):
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any'
     _CLASS_WEIGHTS = [1, 1, 1, 1, 1, 2]
 
-    @staticmethod
-    def get_base_model(model, pretrained):
-        _available_models = ['senet154', 'se_resnet50', 'se_resnext50']
-
-        if model not in _available_models:
-            raise ValueError('Unavailable backbone, choose one from {}'.format(_available_models))
-
-        if model == 'senet154':
-            cut_point = -3
-            pretrained = 'imagenet' if pretrained else None
-            return nn.Sequential(*list(pretrainedmodels.senet154(pretrained=pretrained).children())[:cut_point])
-
-        if model == 'se_resnext50':
-            cut_point = -2
-            pretrained = 'imagenet' if pretrained else None
-            return nn.Sequential(
-                *list(pretrainedmodels.se_resnext50_32x4d(pretrained=pretrained).children())[:cut_point])
-
-        if model == 'se_resnet50':
-            cut_point = -2
-            pretrained = 'imagenet' if pretrained else None
-            return nn.Sequential(*list(pretrainedmodels.se_resnet50(pretrained=pretrained).children())[:cut_point])
-
     def __init__(self, config):
         super(Classifier2DC, self).__init__()
-
         self.config = config
 
         self.train_folds = config.train_folds
         self.val_folds = config.val_folds
 
-        self.backbone = self.get_base_model(config.backbone, config.pretrained)
-        self.last_linear = nn.Linear(Classifier2DC._NUM_FEATURES_BACKBONE, config.n_classes)
+        self.backbone = get_base_model(config)
+        if self.config.multibranch:
+            self.combine_conv = nn.Conv2d(Classifier2DC._NUM_FEATURES_BACKBONE * config.num_slices, config.multibranch_embedding, kernel_size=1)
+            self.last_linear = nn.Linear(config.multibranch_embedding * 2, config.n_classes)
+        else:
+            self.last_linear = nn.Linear(Classifier2DC._NUM_FEATURES_BACKBONE * 2, config.n_classes)
+
         if self.config.dropout > 0:
             self.dropout = nn.Dropout(self.config.dropout)
         else:
             self.dropout = None
+
         self.scheduler = None
 
     def forward(self, x):
+        if self.config.multibranch:
+            x = x.view(self.config.batch_size*self.config.num_slices, 1, x.shape[2], x.shape[3])
         x = self.backbone(x)
-        x = F.adaptive_avg_pool2d(x, 1)
-        x = x.view(x.size(0), -1)
+        if self.config.multibranch:
+            x = x.view(self.config.batch_size, Classifier2DC._NUM_FEATURES_BACKBONE * self.config.num_slices, x.shape[2], x.shape[3])
+            x = self.combine_conv(x)
+
+        x = concat_pool(x)
+
         if self.dropout is not None:
             x = self.dropout(x)
         x = self.last_linear(x)
