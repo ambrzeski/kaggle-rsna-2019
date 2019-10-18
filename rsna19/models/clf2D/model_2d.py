@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -79,6 +81,94 @@ class ClassificationModelResNextGWAP(nn.Module):
 
         if self.dropout > 0:
             x = F.dropout(x, self.dropout, self.training)
+        out = self.fc(x)
+
+        if res:
+            res.append(out)
+            return res
+        else:
+            return out
+
+
+class ClassificationModelResNext(nn.Module):
+    def __init__(self, base_model, nb_features, nb_input_planes=1, dropout=0.5, base_model_features=2048,
+                 use_gwap=True, gwap_scale=2.0, add_bn2=True):
+        super().__init__()
+        self.use_gwap = use_gwap
+        self.base_model = base_model
+        self.dropout = dropout
+        self.nb_features = nb_features
+
+        inplanes = 64
+
+        layer0_modules = [
+            ('conv1', nn.Conv2d(nb_input_planes, 64, 3, stride=2, padding=1, bias=True)),
+            ('relu1', nn.ReLU(inplace=True))
+        ]
+
+        if add_bn2:
+            layer0_modules += [
+                ('conv2', nn.Conv2d(64, 64, 3, stride=1, padding=1, bias=False)),
+                ('bn3', nn.BatchNorm2d(inplanes)),
+                ('relu2', nn.ReLU(inplace=True)),
+            ]
+        else:
+            layer0_modules += [
+                ('conv2', nn.Conv2d(64, 64, 3, stride=1, padding=1, bias=True)),
+                ('relu2', nn.ReLU(inplace=True)),
+            ]
+
+        layer0_modules += [
+            ('conv3', nn.Conv2d(64, inplanes, 3, stride=1, padding=1, bias=False)),
+            ('bn3', nn.BatchNorm2d(inplanes)),
+            ('relu3', nn.ReLU(inplace=True)),
+            ('pool', nn.MaxPool2d(3, stride=2, ceil_mode=True))
+        ]
+        self.layer0 = nn.Sequential(OrderedDict(layer0_modules))
+
+        if use_gwap:
+            self.gwap = GWAP(base_model_features, scale=gwap_scale)
+            self.fc = nn.Linear(base_model_features, nb_features)
+        else:
+            self.fc = nn.Linear(base_model_features*2, nb_features)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+        self.base_model.requires_grad = False
+
+    def unfreeze_encoder(self):
+        self.base_model.requires_grad = True
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs, output_per_pixel=False, output_heatmap=False):
+        res = []
+        x = self.layer0(inputs)
+        x = self.base_model.layer1(x)
+        x = self.base_model.layer2(x)
+        x = self.base_model.layer3(x)
+        x = self.base_model.layer4(x)
+
+        if output_per_pixel:
+            res.append(F.conv2d(x, self.fc.weight[:, :, None, None], self.fc.bias))
+
+        heatmap = None
+        if self.use_gwap:
+            x, heatmap = self.gwap(x, output_heatmap=True)
+        else:
+            avg_pool = F.avg_pool2d(x, x.shape[2:])
+            max_pool = F.max_pool2d(x, x.shape[2:])
+            avg_max_pool = torch.cat((avg_pool, max_pool), 1)
+            x = avg_max_pool.view(avg_max_pool.size(0), -1)
+
+        if output_heatmap:
+            res.append(heatmap)
+
+        if self.dropout > 0:
+            x = F.dropout(x, self.dropout, self.training)
+
         out = self.fc(x)
 
         if res:
@@ -455,6 +545,11 @@ class ClassificationModelEfficientNet(nn.Module):
 def classification_model_se_resnext50_gwap(**kwargs):
     base_model = pretrainedmodels.se_resnext50_32x4d()
     return ClassificationModelResNextGWAP(base_model, nb_features=6, **kwargs)
+
+
+def classification_model_se_resnext50(**kwargs):
+    base_model = pretrainedmodels.se_resnext50_32x4d()
+    return ClassificationModelResNext(base_model, nb_features=6, **kwargs)
 
 
 def classification_model_dpn92(**kwargs):

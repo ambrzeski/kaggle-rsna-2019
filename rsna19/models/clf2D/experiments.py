@@ -1,4 +1,4 @@
-from rsna19.models.clf2D import model_2d
+from rsna19.models.clf2D import model_2d, model_2dc
 
 
 class ModelInfo:
@@ -7,6 +7,7 @@ class ModelInfo:
                  args,
                  dataset_args,
                  batch_size,
+                 nb_slices=1,
                  optimiser='sgd',
                  scheduler='steps',
                  initial_lr=1e-3,
@@ -15,6 +16,7 @@ class ModelInfo:
                  weight_decay=0,
                  is_pretrained=True,
                  ):
+        self.nb_slices = nb_slices
         self.is_pretrained = is_pretrained
         self.weight_decay = weight_decay
         self.accumulation_steps = accumulation_steps
@@ -357,6 +359,78 @@ MODELS = {
                 _w(w=8, l=32),
                 _w(w=40, l=40)
             ]),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_512_crop_384_cdf': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=False, nb_input_planes=1),
+        dataset_args=dict(
+            img_size=512,
+            center_crop=384,
+            convert_cdf=True),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnext50_512_crop_384_cdf_no_bn2': ModelInfo(
+        factory=model_2d.classification_model_se_resnext50,
+        args=dict(use_gwap=False, nb_input_planes=1, add_bn2=False),
+        dataset_args=dict(
+            img_size=512,
+            center_crop=384,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=4
+    ),
+    'resnext50_512_crop_384_cdf': ModelInfo(
+        factory=model_2d.classification_model_se_resnext50,
+        args=dict(use_gwap=False, nb_input_planes=1, add_bn2=True),
+        dataset_args=dict(
+            img_size=512,
+            center_crop=384,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=4
+    ),
+    'resnet34_256_cdf_5_planes_combine_last': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=256,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2
+    ),
+    'resnet34_256_cdf_5_planes_combine_first': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_first,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=256,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_256_cdf_1_plane': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_first,
+        args=dict(nb_input_slices=1),
+        dataset_args=dict(
+            img_size=256,
+            num_slices=1,
+            convert_cdf=True),
         batch_size=64,
         optimiser='radam',
         initial_lr=1e-4,
