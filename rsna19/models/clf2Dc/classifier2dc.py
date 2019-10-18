@@ -42,11 +42,12 @@ class Classifier2DC(pl.LightningModule):
         self.scheduler = None
 
     def forward(self, x):
+        batch_in_size = x.shape[0]
         if self.config.multibranch:
-            x = x.view(self.config.batch_size*self.config.num_slices, 1, x.shape[2], x.shape[3])
+            x = x.view(batch_in_size*self.config.num_slices, 1, x.shape[2], x.shape[3])
         x = self.backbone(x)
         if self.config.multibranch:
-            x = x.view(self.config.batch_size, Classifier2DC._NUM_FEATURES_BACKBONE * self.config.num_slices, x.shape[2], x.shape[3])
+            x = x.view(batch_in_size, Classifier2DC._NUM_FEATURES_BACKBONE * self.config.num_slices, x.shape[2], x.shape[3])
             x = self.combine_conv(x)
 
         x = concat_pool(x)
@@ -56,6 +57,7 @@ class Classifier2DC(pl.LightningModule):
         x = self.last_linear(x)
         return x
 
+    # training step and validation step should return tensor or nested dicts of tensor for data parallel to work
     def training_step(self, batch, batch_nb):
         x, y = batch['image'], batch['labels']
         y_hat = self.forward(x)
