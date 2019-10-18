@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 from copy import deepcopy
 
-from rsna19.data.dataset_2dc import IntracranialDataset
+from rsna19.data.dataset_3d import IntracranialDataset3D
 from rsna19.models.commons.balancing_sampler import BalancedBatchSampler
 import rsna19.models.commons.metrics as metrics
 from rsna19.models.commons.radam import RAdam
@@ -37,7 +37,7 @@ class MedicalNetModule(pl.LightningModule):
 
     def forward(self, x):
         x = self.backbone(x)
-        x = F.adaptive_avg_pool2d(x, 1)
+        x = F.adaptive_avg_pool3d(x, 1)
         x = x.view(x.size(0), -1)
         if self.dropout is not None:
             x = self.dropout(x)
@@ -109,17 +109,17 @@ class MedicalNetModule(pl.LightningModule):
     @pl.data_loader
     def train_dataloader(self):
         if self.config.balancing:
-            return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment),
+            return DataLoader(IntracranialDataset3D(self.config, self.train_folds, augment=self.config.augment),
                               num_workers=self.config.num_workers,
                               batch_sampler=BalancedBatchSampler(self.config, self.train_folds))
         else:
-            return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment),
+            return DataLoader(IntracranialDataset3D(self.config, self.train_folds, augment=self.config.augment),
                               num_workers=self.config.num_workers,
                               batch_size=self.config.batch_size,
                               shuffle=True)
 
     @pl.data_loader
     def val_dataloader(self):
-        return DataLoader(IntracranialDataset(self.config, self.val_folds),
+        return DataLoader(IntracranialDataset3D(self.config, self.val_folds),
                           num_workers=self.config.num_workers,
                           batch_size=self.config.batch_size)

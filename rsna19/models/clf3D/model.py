@@ -11,77 +11,26 @@ def generate_model(opt):
     if opt.model == 'resnet':
         assert opt.model_depth in [10, 18, 34, 50, 101, 152, 200]
         
-        if opt.model_depth == 10:
-            model = resnet.resnet10(
-                sample_input_W=opt.input_W,
-                sample_input_H=opt.input_H,
-                sample_input_D=opt.input_D,
-                shortcut_type=opt.resnet_shortcut,
-                no_cuda=opt.no_cuda,
-                num_seg_classes=opt.n_seg_classes)
-        elif opt.model_depth == 18:
-            model = resnet.resnet18(
-                sample_input_W=opt.input_W,
-                sample_input_H=opt.input_H,
-                sample_input_D=opt.input_D,
-                shortcut_type=opt.resnet_shortcut,
-                no_cuda=opt.no_cuda,
-                num_seg_classes=opt.n_seg_classes)
-        elif opt.model_depth == 34:
-            model = resnet.resnet34(
-                sample_input_W=opt.input_W,
-                sample_input_H=opt.input_H,
-                sample_input_D=opt.input_D,
-                shortcut_type=opt.resnet_shortcut,
-                no_cuda=opt.no_cuda,
-                num_seg_classes=opt.n_seg_classes)
-        elif opt.model_depth == 50:
-            model = resnet.resnet50(
-                sample_input_W=opt.input_W,
-                sample_input_H=opt.input_H,
-                sample_input_D=opt.input_D,
-                shortcut_type=opt.resnet_shortcut,
-                no_cuda=opt.no_cuda,
-                num_seg_classes=opt.n_seg_classes)
-        elif opt.model_depth == 101:
-            model = resnet.resnet101(
-                sample_input_W=opt.input_W,
-                sample_input_H=opt.input_H,
-                sample_input_D=opt.input_D,
-                shortcut_type=opt.resnet_shortcut,
-                no_cuda=opt.no_cuda,
-                num_seg_classes=opt.n_seg_classes)
-        elif opt.model_depth == 152:
-            model = resnet.resnet152(
-                sample_input_W=opt.input_W,
-                sample_input_H=opt.input_H,
-                sample_input_D=opt.input_D,
-                shortcut_type=opt.resnet_shortcut,
-                no_cuda=opt.no_cuda,
-                num_seg_classes=opt.n_seg_classes)
-        elif opt.model_depth == 200:
-            model = resnet.resnet200(
-                sample_input_W=opt.input_W,
-                sample_input_H=opt.input_H,
-                sample_input_D=opt.input_D,
-                shortcut_type=opt.resnet_shortcut,
-                no_cuda=opt.no_cuda,
-                num_seg_classes=opt.n_seg_classes)
-    
-    if not opt.no_cuda:
-        if len(opt.gpu_id) > 1:
-            model = model.cuda() 
-            model = nn.DataParallel(model, device_ids=opt.gpu_id)
-            net_dict = model.state_dict() 
-        else:
-            import os
-            os.environ["CUDA_VISIBLE_DEVICES"]=str(opt.gpu_id[0])
-            model = model.cuda() 
-            model = nn.DataParallel(model, device_ids=None)
-            net_dict = model.state_dict()
+        resnet_class = getattr(resnet, "resnet" + str(opt.model_depth))
+        model = resnet_class(
+            sample_input_W=opt.input_W,
+            sample_input_H=opt.input_H,
+            sample_input_D=opt.input_D,
+            shortcut_type=opt.resnet_shortcut,
+            no_cuda=opt.no_cuda,
+            num_seg_classes=opt.n_seg_classes)
+
+    if len(opt.gpu_id) > 1:
+        model = model.cuda() 
+        model = nn.DataParallel(model, device_ids=opt.gpu_id)
+        net_dict = model.state_dict() 
     else:
+        import os
+        os.environ["CUDA_VISIBLE_DEVICES"]=str(opt.gpu_id[0])
+        model = model.cuda() 
+        model = nn.DataParallel(model, device_ids=None)
         net_dict = model.state_dict()
-    
+
     # load pretrain
     if opt.phase != 'test' and opt.pretrain_path:
         print ('loading pretrained model {}'.format(opt.pretrain_path))
