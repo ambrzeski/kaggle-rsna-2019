@@ -77,18 +77,38 @@ class IntracranialDataset(Dataset):
                                            self.config.min_hu_value,
                                            self.config.max_hu_value)
 
-        slices_image = slices_image.transpose((1, 2, 0))
+        slices_image = (slices_image.transpose((1, 2, 0)) + 1) / 2
 
         transforms = []
         if self.augment:
-            transforms.append(albumentations.ShiftScaleRotate(
+            if self.config.vertical_flip:
+                transforms.append(albumentations.VerticalFlip(p=0.5))
+
+            if self.config.pixel_augment:
+                transforms.append(albumentations.RandomBrightnessContrast(0.2, 0.2, False, 0.8))
+
+            if self.config.elastic_transform:
+                transforms.append(albumentations.ElasticTransform(
+                    alpha=20,
+                    sigma=6,
+                    alpha_affine=10,
+                    interpolation=cv2.INTER_LINEAR,
+                    border_mode=cv2.BORDER_CONSTANT,
+                    value=0,
+                    p=0.5
+                ))
+
+            transforms.extend([
+                albumentations.HorizontalFlip(p=0.5),
+                albumentations.ShiftScaleRotate(
                     shift_limit=0, scale_limit=0.15, rotate_limit=30,
                     interpolation=cv2.INTER_LINEAR,
-                    border_mode=cv2.BORDER_REPLICATE,
-                    p=0.8))
-            transforms.append(albumentations.HorizontalFlip(p=0.5))
+                    border_mode=cv2.BORDER_CONSTANT,
+                    value=0,
+                    p=0.9),
+            ])
 
-        if self.config.random_crop:
+        if self.augment and self.config.random_crop:
             transforms.append(albumentations.RandomCrop(self.config.crop_size, self.config.crop_size))
         else:
             transforms.append(albumentations.CenterCrop(self.config.crop_size, self.config.crop_size))
@@ -96,7 +116,7 @@ class IntracranialDataset(Dataset):
         transforms.append(albumentations.pytorch.ToTensorV2())
 
         processed = albumentations.Compose(transforms)(image=slices_image)
-        img = processed['image']
+        img = (processed['image'] * 2) - 1
 
         # img = torch.tensor(slices_image, dtype=torch.float32)
 
@@ -116,3 +136,23 @@ class IntracranialDataset(Dataset):
                                                              'any']], dtype=torch.float32)
 
         return out
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    from rsna19.configs.se_resnext50_2dc import Config as config
+
+    dataset = IntracranialDataset(config, [0], augment=True)
+    show_all_slices = False
+
+    for i in range(10):
+        sample = dataset[0]
+        img = sample['image'].numpy()
+        print(sample['labels'], img.shape, img.min(), img.max())
+        if show_all_slices:
+            for slice_ in img:
+                plt.imshow(slice_, cmap='gray')
+                plt.show()
+        else:
+            plt.imshow(img[img.shape[0] // 2], cmap='gray')
+            plt.show()
