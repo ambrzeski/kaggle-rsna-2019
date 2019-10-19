@@ -1,4 +1,7 @@
 import json
+
+import albumentations
+import cv2
 from torch.nn import functional as F
 import os
 import torch
@@ -10,14 +13,29 @@ import pandas as pd
 from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.clf2Dc.classifier2dc import Classifier2DC
 
+TTA_TRANSFORMS = {
+    None: None,
+    'hflip': [albumentations.HorizontalFlip(True)],
+    'vflip': [albumentations.VerticalFlip(True)],
+    'lrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
+                                     value=0, always_apply=True)],
+    'rrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
+                                     value=0, always_apply=True)]
+}
 
-def predict(checkpoint_path, device, subset):
+
+def predict(checkpoint_path, device, subset, tta_variant=None):
     assert subset in ['train', 'val', 'test']
+    assert tta_variant in TTA_TRANSFORMS
+
     train_dir = os.path.join(os.path.dirname(checkpoint_path), '..')
     config_path = os.path.join(train_dir, 'version_0/config.json')
 
     checkpoint_name = os.path.basename(checkpoint_path).split('.')[0]
-    df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}.csv')
+    if tta_variant is None:
+        df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}.csv')
+    else:
+        df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}_{tta_variant}.csv')
     os.makedirs(os.path.dirname(df_out_path), exist_ok=True)
 
     with open(config_path, 'r') as f:
@@ -25,7 +43,6 @@ def predict(checkpoint_path, device, subset):
         if 'dropout' not in config_dict:
             config_dict['dropout'] = 0
         config = type('config', (), config_dict)
-
 
     with torch.cuda.device(device):
         checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
@@ -45,7 +62,8 @@ def predict(checkpoint_path, device, subset):
         else:
             folds = None
 
-        dataset = IntracranialDataset(config, folds, subset == 'test', False)
+        dataset = IntracranialDataset(config, folds, subset == 'test', augment=False,
+                                      transforms=TTA_TRANSFORMS[tta_variant])
 
         all_paths = []
         all_study_id = []
@@ -93,4 +111,4 @@ if __name__ == '__main__':
         '/kolos/m2/ct/models/classification/rsna/0014_384/1234/models/_ckpt_epoch_4.ckpt'
     ]
 
-    predict(checkpoint_paths[4], 0, 'test')
+    predict(checkpoint_paths[0], 0, 'val', 'hflip')

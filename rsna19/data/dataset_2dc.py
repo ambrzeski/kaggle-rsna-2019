@@ -18,7 +18,7 @@ from rsna19.preprocessing.hu_converter import HuConverter
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, test=False, augment=False, use_cq500=False):
+    def __init__(self, config, folds, test=False, augment=False, use_cq500=False, transforms=None):
         """
         :param folds: list of selected folds
         :param return_labels: if True, labels will be returned with image
@@ -26,6 +26,7 @@ class IntracranialDataset(Dataset):
         self.config = config
         self.test = test
         self.augment = augment
+        self.additional_transforms = transforms
 
         if config.csv_root_dir is None:
             csv_root_dir = os.path.normpath(__file__ + '/../csv')
@@ -86,6 +87,9 @@ class IntracranialDataset(Dataset):
             slices_image = np.concatenate((slices_image, seg_masks), axis=2)
 
         transforms = []
+        if self.additional_transforms is not None:
+            transforms.extend(self.additional_transforms)
+
         if self.augment:
             if self.config.vertical_flip:
                 transforms.append(albumentations.VerticalFlip(p=0.5))
