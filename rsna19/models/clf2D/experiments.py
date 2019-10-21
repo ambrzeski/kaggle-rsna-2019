@@ -1,4 +1,5 @@
 from rsna19.models.clf2D import model_2d, model_2dc
+from models.clf3D import model_3d
 
 
 class ModelInfo:
@@ -15,7 +16,9 @@ class ModelInfo:
                  accumulation_steps=1,
                  weight_decay=0,
                  is_pretrained=True,
+                 use_3d=False
                  ):
+        self.use_3d = use_3d
         self.nb_slices = nb_slices
         self.is_pretrained = is_pretrained
         self.weight_decay = weight_decay
@@ -435,5 +438,56 @@ MODELS = {
         optimiser='radam',
         initial_lr=1e-4,
         accumulation_steps=1
+    ),
+    'resnet34_256_cdf_3_planes_combine_last': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last,
+        args=dict(nb_input_slices=3),
+        dataset_args=dict(
+            img_size=256,
+            num_slices=3,
+            convert_cdf=True),
+        batch_size=64,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_400_5_planes_combine_last': ModelInfo(
+        factory=model_3d.classification_model_resnet34_combine_last,
+        use_3d=True,
+        args=dict(combine_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            # center_crop=384,
+            num_slices=8,
+            combine_slices_padding=2,
+            convert_cdf=True),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=4
+    ),
+    'resnet34_400_cdf': ModelInfo(
+        factory=model_2d.classification_model_resnet34,
+        args=dict(use_gwap=False, nb_input_planes=1),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=2,
+            convert_cdf=True),
+        batch_size=32,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1
+    ),
+    'resnet34_400_5_planes_combine_last_individual': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=4
     ),
 }

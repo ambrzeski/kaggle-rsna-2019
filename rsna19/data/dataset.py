@@ -67,7 +67,7 @@ class IntracranialDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        data_path = self.data.loc[idx, 'path']
+        data_path = self.data.loc[idx, 'path'].replace('/npy/', '/3d/')
         study_id = data_path.split('/')[-3]
         slice_num = int(os.path.basename(data_path).split('.')[0])
         full_path = os.path.normpath(os.path.join(BaseConfig.data_root, '..', data_path))

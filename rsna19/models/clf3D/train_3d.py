@@ -5,51 +5,24 @@ import os
 import numpy as np
 import torch
 import torch.optim as optim
+import torchsummary as torchsummary
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 from tqdm import tqdm
-from rsna19.data import dataset
+from rsna19.data import dataset, dataset_3d
 import albumentations
 import albumentations.pytorch
 import cv2
 import matplotlib.pyplot as plt
-import sklearn.metrics
-
 import torch.nn as nn
 import torch.nn.functional as F
 from rsna19.configs.base_config import BaseConfig
 from rsna19.models.commons import radam
-from rsna19.models.commons import metrics
 from rsna19.models.clf2D.experiments import MODELS
 from torch.utils.tensorboard import SummaryWriter
 
-
-def build_model_str(model_name, fold, run):
-    run_str = '' if not run else f'_{run}'
-    fold_str = '' if fold == -1 else f'_fold_{fold}'
-
-    return f'{model_name}{run_str}{fold_str}'
-
-
-def log_metrics(logger, phase, epoch_num, y_hat, y):
-    th = 0.5
-    accuracy = metrics.accuracy(y_hat, y, th, True)
-    f1_score = metrics.f1score(y_hat, y, th, True)
-    specificity = metrics.specificity(y_hat, y, th, True)
-    sensitivity = metrics.sensitivity(y_hat, y, th, True)
-    roc_auc = metrics.roc_auc(y_hat, y)
-
-    classes = ['epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any']
-    for acc, f1, spec, sens, roc, class_name in zip(accuracy, f1_score, specificity, sensitivity, roc_auc, classes):
-        logger.add_scalar(f'{phase}_acc_{class_name}', acc, epoch_num)
-        logger.add_scalar(f'{phase}_f1_{class_name}', f1, epoch_num)
-        logger.add_scalar(f'{phase}_spec_{class_name}', spec, epoch_num)
-        logger.add_scalar(f'{phase}_sens_{class_name}', sens, epoch_num)
-        logger.add_scalar(f'{phase}_roc_{class_name}', roc, epoch_num)
-
-    for i, class_name in enumerate(classes):
-        logger.add_scalar(f'{phase}_bce_{class_name}', sklearn.metrics.log_loss(y[:, i], y_hat[:, i]), epoch_num)
+from rsna19.models.clf2D.train import build_model_str, log_metrics
 
 
 def train(model_name, fold, run=None, resume_epoch=-1):
@@ -71,7 +44,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     model = model.cuda()
 
     # try:
-    #     torchsummary.summary(model, (4, 512, 512))
+    #     torchsummary.summary(model, (8, 400, 400))
     #     print('\n', model_name, '\n')
     # except:
     #     raise
@@ -80,9 +53,12 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     model = torch.nn.DataParallel(model).cuda()
     model = model.cuda()
 
-    dataset_train = dataset.IntracranialDataset(
+    dataset_module = dataset_3d
+
+    dataset_train = dataset_module.IntracranialDataset(
         csv_file='5fold.csv',
         folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
+        random_slice=True,
         preprocess_func=albumentations.Compose([
             albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
                                             interpolation=cv2.INTER_LINEAR,
@@ -95,17 +71,19 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         **model_info.dataset_args
     )
 
-    dataset_valid = dataset.IntracranialDataset(
+    dataset_valid = dataset_module.IntracranialDataset(
         csv_file='5fold.csv',
         folds=[fold],
+        random_slice=False,
+        # return_all_slices=True,
         preprocess_func=albumentations.pytorch.ToTensorV2(),
-        **model_info.dataset_args
+        **{**model_info.dataset_args, 'num_slices': 32}
     )
 
     model.train()
     optimizer = radam.RAdam(model.parameters(), lr=model_info.initial_lr)
 
-    milestones = [5, 10, 16]
+    milestones = [32, 48, 64]
     if model_info.optimiser_milestones:
         milestones = model_info.optimiser_milestones
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.2)
@@ -125,22 +103,23 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         'val':   DataLoader(dataset_valid,
                             shuffle=False,
                             num_workers=16,
-                            batch_size=model_info.batch_size)
+                            batch_size=2)
     }
 
     class_weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 1.0, 2.0]).cuda()
 
-    def criterium(y_pred,y_true):
-        return F.binary_cross_entropy_with_logits(y_pred, y_true, class_weights.repeat(y_pred.shape[0], 1))
-
-    # criterium = nn.BCEWithLogitsLoss()
+    def criterium(y_pred, y_true):
+        y_pred = y_pred.reshape(-1, 6)
+        y_true = y_true.reshape(-1, 6)
+        cw = class_weights.repeat(y_pred.shape[0], 1)
+        return F.binary_cross_entropy_with_logits(y_pred, y_true, cw)
 
     # fit new layers first:
     if resume_epoch == -1 and model_info.is_pretrained:
         model.train()
         model.module.freeze_encoder()
         data_loader = data_loaders['train']
-        pre_fit_steps = 50000 // model_info.batch_size
+        pre_fit_steps = len(dataset_train) // model_info.batch_size // 2
         data_iter = tqdm(enumerate(data_loader), total=pre_fit_steps)
         epoch_loss = []
         initial_optimizer = radam.RAdam(model.parameters(), lr=1e-3)
@@ -149,7 +128,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 break
             with torch.set_grad_enabled(True):
                 img = data['image'].float().cuda()
-                labels = data['labels'].cuda()
+                labels = data['labels'].float().cuda()
                 pred = model(img)
                 loss = criterium(pred, labels)
                 loss.backward()
@@ -158,10 +137,10 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 initial_optimizer.zero_grad()
                 epoch_loss.append(float(loss))
 
-                data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-500:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
+                data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-100:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
     model.module.unfreeze_encoder()
 
-    for epoch_num in range(resume_epoch+1, 12):
+    for epoch_num in range(resume_epoch+1, 128):
         for phase in ['train', 'val']:
             model.train(phase == 'train')
             epoch_loss = []
@@ -196,7 +175,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                     epoch_sample_paths += data['path']
 
                 data_iter.set_description(
-                    f'{epoch_num} Loss: Running {np.mean(epoch_loss[-1000:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
+                    f'{epoch_num} Loss: Running {np.mean(epoch_loss[-100:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
 
             epoch_labels = np.row_stack(epoch_labels)
             epoch_predictions = np.row_stack(epoch_predictions)
