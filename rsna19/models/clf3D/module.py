@@ -16,7 +16,6 @@ from rsna19.models.clf3D.model import generate_model
 
 
 class MedicalNetModule(pl.LightningModule):
-    _NUM_FEATURES_BACKBONE = 2048
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any'
     _CLASS_WEIGHTS = [1, 1, 1, 1, 1, 2]
 
@@ -28,21 +27,10 @@ class MedicalNetModule(pl.LightningModule):
         self.train_folds = config.train_folds
         self.val_folds = config.val_folds
 
-        self.backbone = generate_model(config.backbone)
-        self.last_linear = nn.Linear(MedicalNetModule._NUM_FEATURES_BACKBONE, config.n_classes)
-        if self.config.dropout > 0:
-            self.dropout = nn.Dropout(self.config.dropout)
-        else:
-            self.dropout = None
+        self.backbone = generate_model(config)
 
     def forward(self, x):
-        x = self.backbone(x)
-        x = F.adaptive_avg_pool3d(x, 1)
-        x = x.view(x.size(0), -1)
-        if self.dropout is not None:
-            x = self.dropout(x)
-        x = self.last_linear(x)
-        return x
+        return self.backbone(x)
 
     def training_step(self, batch, batch_nb):
         x, y = batch['image'], batch['labels']
@@ -101,10 +89,25 @@ class MedicalNetModule(pl.LightningModule):
         return out_dict
 
     def configure_optimizers(self):
+        new_parameters = []
+        for pname, p in self.named_parameters():
+            for layer_name in self.config.new_layer_names:
+                if layer_name in pname:
+                    print(pname)
+                    new_parameters.append(p)
+                    break
+
+        new_parameters_id = list(map(id, new_parameters))
+        base_parameters = list(filter(lambda p: id(p) not in new_parameters_id, self.parameters()))
+        parameters = [
+            {'params': base_parameters, 'lr': self.config.lr},
+            {'params': new_parameters, 'lr': self.config.lr * self.config.new_params_lr_boost}
+        ]
+
         if self.config.optimizer == 'adam':
-            return torch.optim.Adam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+            return torch.optim.Adam(parameters, lr=self.config.lr, weight_decay=self.config.weight_decay)
         elif self.config.optimizer == 'radam':
-            return RAdam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+            return RAdam(parameters, lr=self.config.lr, weight_decay=self.config.weight_decay)
 
     @pl.data_loader
     def train_dataloader(self):

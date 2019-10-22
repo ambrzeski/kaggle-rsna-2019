@@ -114,11 +114,10 @@ class ResNet(nn.Module):
     def __init__(self,
                  block,
                  layers,
-                 sample_input_D,
-                 sample_input_H,
-                 sample_input_W,
+                 dropout,
+                 num_classes=6,
                  shortcut_type='B',
-                 no_cuda = False):
+                 no_cuda=False):
         self.inplanes = 64
         self.no_cuda = no_cuda
         super(ResNet, self).__init__()
@@ -140,6 +139,15 @@ class ResNet(nn.Module):
             block, 256, layers[2], shortcut_type, stride=1, dilation=2)
         self.layer4 = self._make_layer(
             block, 512, layers[3], shortcut_type, stride=1, dilation=4)
+
+        self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
+
+        if dropout > 0:
+            self.dropout = nn.Dropout(dropout)
+        else:
+            self.dropout = None
+
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -195,6 +203,13 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        
+        if self.dropout is not None:
+            x = self.dropout(x)
+        
+        x = self.fc(x)
         return x
 
 def resnet10(**kwargs):
