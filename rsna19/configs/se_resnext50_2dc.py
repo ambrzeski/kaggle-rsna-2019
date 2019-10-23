@@ -2,7 +2,7 @@ from rsna19.configs.base_config import BaseConfig
 
 
 class Config(BaseConfig):
-    train_out_dir = '/kolos/m2/ct/models/classification/rsna/test_branches'
+    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0018_new_aug_vert/0124'
 
     dataset_file = '5fold.csv'
     data_version = '3d'  # '3d', 'npy', 'npy256' etc.
@@ -34,6 +34,9 @@ class Config(BaseConfig):
     pre_crop_size = 400
     crop_size = 384
     random_crop = True
+    vertical_flip = True
+    pixel_augment = False
+    elastic_transform = True
     use_cdf = True
     augment = True
 
