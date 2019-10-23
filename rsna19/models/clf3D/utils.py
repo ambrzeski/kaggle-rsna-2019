@@ -11,8 +11,7 @@ def generate_model(config):
     )
 
     model = model.cuda() 
-    model = nn.DataParallel(model, device_ids=config.gpus)
-    net_dict = model.state_dict() 
+    net_dict = model.state_dict()
 
     if config.pretrained:
         print('Loading pretrained model {}'.format(config.pretrained))
@@ -21,7 +20,5 @@ def generate_model(config):
          
         net_dict.update(pretrain_dict)
         model.load_state_dict(net_dict)
-
-        return model
 
     return model
