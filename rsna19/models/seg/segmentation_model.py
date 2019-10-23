@@ -18,13 +18,13 @@ class SegmentationModel(pl.LightningModule):
         self.train_folds = config.train_folds
         self.val_folds = config.val_folds
 
-        self.model = smp.Unet(config.backbone, classes=config.n_classes, activation='softmax')
+        self.model = smp.Unet(config.backbone, classes=config.n_classes, activation='sigmoid')
 
         self.scheduler = None
         self.loss_func = smp.utils.losses.BCEDiceLoss(eps=1.)
 
-        self.iou_metric = smp.utils.metrics.IoUMetric(eps=1., activation='softmax2d')
-        self.f_score_metric = smp.utils.metrics.FscoreMetric(eps=1., activation='softmax2d')
+        self.iou_metric = smp.utils.metrics.IoUMetric(eps=1., activation='sigmoid')
+        self.f_score_metric = smp.utils.metrics.FscoreMetric(eps=1., activation='sigmoid')
 
     def forward(self, x):
         x = self.model(x)
