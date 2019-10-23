@@ -151,7 +151,7 @@ class ResNet(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
-                m.weight = nn.init.kaiming_normal(m.weight, mode='fan_out')
+                m.weight = nn.init.kaiming_normal_(m.weight, mode='fan_out')
             elif isinstance(m, nn.BatchNorm3d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
@@ -208,7 +208,7 @@ class ResNet(nn.Module):
         
         if self.dropout is not None:
             x = self.dropout(x)
-        
+
         x = self.fc(x)
         return x
 

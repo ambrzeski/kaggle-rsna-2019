@@ -9,24 +9,24 @@ class Config(BaseConfig):
     train_folds = [0, 1, 2, 3]
     val_folds = [4]
 
-    backbone = 'resnet34'
-    pretrained = '/kolos/m2/ct/models/classification/rsna/pretrain/resnet_34.pth'
+    backbone = 'resnet18'
+    pretrained = '/kolos/m2/ct/models/classification/rsna/pretrained_3d/resnet18_23dataset.pth'
     resnet_shortcut = 'A'   # 'A' or 'B'
     new_layer_names = ['fc']
 
     lr = 1e-4
-    new_params_lr_boost = 1e2
-    batch_size = 16  # 16 (3, 512, 512) images fits on TITAN XP
+    new_params_lr_boost = 10
+    batch_size = 32  # 16 (3, 512, 512) images fits on TITAN XP
     dropout = 0.5
     weight_decay = 0.001
     optimizer = 'radam'
 
-    gpus = [2]
+    gpus = [0, 1]
     num_workers = 3 * len(gpus)
 
     max_epoch = 20
 
-    num_slices = 15  # must be odd
+    num_slices = 11  # must be odd
     pre_crop_size = 400
     crop_size = 384
     random_crop = True
@@ -43,3 +43,7 @@ class Config(BaseConfig):
     balancing = False
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', no_bleeding
     probas = [0.1, 0.14, 0.14, 0.14, 0.14, 0.34]
+
+
+assert (not Config.pretrained) or (Config.backbone in Config.pretrained), \
+    "The backbone depth and the pretrained model depth should be equal."

@@ -30,7 +30,8 @@ class MedicalNetModule(pl.LightningModule):
         self.backbone = generate_model(config)
 
     def forward(self, x):
-        return self.backbone(x)
+        y = self.backbone(x)
+        return y
 
     def training_step(self, batch, batch_nb):
         x, y = batch['image'], batch['labels']
@@ -43,15 +44,15 @@ class MedicalNetModule(pl.LightningModule):
         y_hat = self.forward(x)
         class_weights = torch.tensor(self._CLASS_WEIGHTS, dtype=torch.float32).to(y_hat.get_device())
 
-        return {'val_loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights).cpu().numpy(),
-                'y_hat_np': torch.sigmoid(y_hat).cpu().numpy(),
-                'y_np': y.cpu().numpy()}
+        return {'val_loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights),
+                'y_hat_np': torch.sigmoid(y_hat),
+                'y_np': y}
 
     def validation_end(self, outputs):
         out_dict = {}
 
-        y_hat = np.concatenate([x['y_hat_np'] for x in outputs])
-        y = np.concatenate([x['y_np'] for x in outputs])
+        y_hat = np.concatenate([x['y_hat_np'].cpu().numpy() for x in outputs])
+        y = np.concatenate([x['y_np'].cpu().numpy() for x in outputs])
 
         th = 0.5
         accuracy = metrics.accuracy(y_hat, y, th, True)
@@ -80,7 +81,7 @@ class MedicalNetModule(pl.LightningModule):
             out_dict['{}_prec'.format(class_name)] = prec
             out_dict['{}_f1_spec'.format(class_name)] = f1_spec
 
-        avg_loss = np.stack([x['val_loss'] for x in outputs]).mean()
+        avg_loss = np.stack([x['val_loss'].cpu().numpy() for x in outputs]).mean()
         out_dict['avg_val_loss'] = avg_loss
 
         # implementation probably used in competition, gives slightly different results than torch
