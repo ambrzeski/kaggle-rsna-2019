@@ -54,7 +54,11 @@ class IntracranialDataset(Dataset):
 
         middle_img_path = Path(path)
 
-        slices_image = load_scan_2dc(middle_img_path, self.config.num_slices, self.config.pre_crop_size)
+        middle_img_num = int(middle_img_path.stem)
+        slices_indices = list(range(middle_img_num - self.config.num_slices // 2,
+                                    middle_img_num + self.config.num_slices // 2 + 1))
+
+        slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
 
         if self.config.use_cdf:
             slices_image = self.hu_converter.convert(slices_image)
