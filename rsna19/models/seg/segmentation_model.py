@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import segmentation_models_pytorch as smp
 
 from rsna19.data.dataset_seg import IntracranialDataset
+from rsna19.models.commons.get_base_model import load_base_weights
 from rsna19.models.commons.radam import RAdam
 
 
@@ -18,7 +19,17 @@ class SegmentationModel(pl.LightningModule):
         self.train_folds = config.train_folds
         self.val_folds = config.val_folds
 
-        self.model = smp.Unet(config.backbone, classes=config.n_classes, activation='sigmoid')
+        if config.pretrained == 'imagenet':
+            self.model = smp.Unet(config.backbone, classes=config.n_classes, activation='sigmoid')
+        else:
+            self.model = smp.Unet(config.backbone, classes=config.n_classes, activation='sigmoid', encoder_weights=None)
+
+            if config.pretrained is not None:
+                weights = load_base_weights(config.pretrained, 3)
+                weights = {'layer' + k: v for k, v in weights.items()}
+                weights['last_linear.bias'] = None
+                weights['last_linear.weight'] = None
+                self.model.encoder.load_state_dict(weights)
 
         self.scheduler = None
         self.loss_func = smp.utils.losses.BCEDiceLoss(eps=1.)
@@ -63,11 +74,11 @@ class SegmentationModel(pl.LightningModule):
     def configure_optimizers(self):
         if self.config.optimizer == 'adam':
             optimizer = torch.optim.Adam([{'params': self.model.decoder.parameters(), 'lr': self.config.decoder_lr},
-                                          {'params': self.model.encoder.parameters(), 'lr': self.config.encoder_lr},],
+                                          {'params': self.model.encoder.parameters(), 'lr': self.config.encoder_lr}, ],
                                          lr=self.config.lr, weight_decay=self.config.weight_decay)
         elif self.config.optimizer == 'radam':
             optimizer = RAdam([{'params': self.model.decoder.parameters(), 'lr': self.config.decoder_lr},
-                               {'params': self.model.encoder.parameters(), 'lr': self.config.encoder_lr},],
+                               {'params': self.model.encoder.parameters(), 'lr': self.config.encoder_lr}, ],
                               lr=self.config.lr, weight_decay=self.config.weight_decay)
 
         if self.config.scheduler['name'] == 'flat_anneal':

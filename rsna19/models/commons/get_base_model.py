@@ -54,21 +54,28 @@ def get_base_model(config):
             model[0].conv1.weight[:, diff:diff + 3, :, :].data.copy_(conv1_weights)
 
     else:
-        weights = torch.load(weights_path, map_location='cpu')['state_dict']
-        weights = {k.replace('backbone.', ''): v for k, v in weights.items() if not k.startswith('last')}
-
-        conv1_weights = weights['0.conv1.weight']
-        new_conv1_weights = torch.zeros_like(model[0].conv1.weight.data)
-
-        mid_c = conv1_weights.shape[1] // 2
-        new_mid_c = new_conv1_weights.shape[1] // 2
-        copied_channels = min(conv1_weights.shape[1], new_conv1_weights.shape[1])
-
-        new_conv1_weights[:, new_mid_c - copied_channels // 2: new_mid_c + copied_channels // 2 + 1, :, :] = \
-            conv1_weights[:, mid_c - copied_channels // 2: mid_c + copied_channels // 2 + 1, :, :]
-
-        weights['0.conv1.weight'] = new_conv1_weights
-
+        weights = load_base_weights(weights_path, input_channels)
         model.load_state_dict(weights)
 
     return model
+
+
+def load_base_weights(weights_path, input_channels):
+    weights = torch.load(weights_path, map_location='cpu')['state_dict']
+    weights = {k.replace('backbone.', ''): v for k, v in weights.items() if not k.startswith('last')}
+
+    conv1_weights = weights['0.conv1.weight']
+    new_shape = list(conv1_weights.shape)
+    new_shape[1] = input_channels
+    new_conv1_weights = torch.zeros(new_shape)
+
+    mid_c = conv1_weights.shape[1] // 2
+    new_mid_c = new_conv1_weights.shape[1] // 2
+    copied_channels = min(conv1_weights.shape[1], new_conv1_weights.shape[1])
+
+    new_conv1_weights[:, new_mid_c - copied_channels // 2: new_mid_c + copied_channels // 2 + 1, :, :] = \
+        conv1_weights[:, mid_c - copied_channels // 2: mid_c + copied_channels // 2 + 1, :, :]
+
+    weights['0.conv1.weight'] = new_conv1_weights
+
+    return weights

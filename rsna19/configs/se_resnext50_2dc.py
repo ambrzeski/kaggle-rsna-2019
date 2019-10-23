@@ -37,9 +37,9 @@ class Config(BaseConfig):
     pre_crop_size = 400
     crop_size = 384
     random_crop = True
-    vertical_flip = True
+    vertical_flip = False
     pixel_augment = False
-    elastic_transform = True
+    elastic_transform = False
     use_cdf = True
     augment = True
 
