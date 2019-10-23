@@ -11,7 +11,7 @@ import albumentations
 import albumentations.pytorch
 import cv2
 
-from rsna19.data.utils import normalize_train
+from rsna19.data.utils import normalize_train, load_scan_2dc
 from rsna19.preprocessing.hu_converter import HuConverter
 
 
@@ -57,20 +57,10 @@ class IntracranialDataset(Dataset):
         middle_img_path = Path(path)
 
         middle_img_num = int(middle_img_path.stem)
-        slices_image = np.zeros((self.config.num_slices, self.config.pre_crop_size, self.config.pre_crop_size))
-        for slice_idx, img_num in enumerate(range(middle_img_num - self.config.num_slices // 2,
-                                                  middle_img_num + self.config.num_slices // 2 + 1)):
+        slices_indices = list(range(middle_img_num - self.config.num_slices // 2,
+                                    middle_img_num + self.config.num_slices // 2 + 1))
 
-            if img_num < 0 or img_num > (len(os.listdir(middle_img_path.parent)) - 1):
-                slice_img = np.full((self.config.pre_crop_size, self.config.pre_crop_size), self._HU_AIR)
-            else:
-                slice_img = np.load(middle_img_path.parent.joinpath('{:03d}.npy'.format(img_num)))
-
-            if slice_img.shape != (self.config.pre_crop_size, self.config.pre_crop_size):
-                slice_img = cv2.resize(np.int16(slice_img), (self.config.pre_crop_size, self.config.pre_crop_size),
-                                       interpolation=cv2.INTER_AREA)
-
-            slices_image[slice_idx] = slice_img
+        slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
 
         if self.config.use_cdf:
             slices_image = self.hu_converter.convert(slices_image)

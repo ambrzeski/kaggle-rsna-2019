@@ -2,15 +2,18 @@ from rsna19.configs.base_config import BaseConfig
 
 
 class Config(BaseConfig):
-    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0018_new_aug_vert/0124'
+    train_out_dir = '/kolos/m2/ct/models/classification/rsna/test4'
 
     dataset_file = '5fold.csv'
     data_version = '3d'  # '3d', 'npy', 'npy256' etc.
-    train_folds = [0, 1, 2, 4]
-    val_folds = [3]
+    train_folds = [0, 1, 2, 3]
+    val_folds = [4]
 
     backbone = 'se_resnext50'
-    pretrained = True
+
+    # 'imagenet', None or path to weights
+    # pretrained = 'imagenet'
+    pretrained = '/kolos/m2/ct/models/classification/rsna/0014_384/0123/models/_ckpt_epoch_2.ckpt'
 
     lr = 1e-4
     batch_size = 26  # 16 (3, 512, 512) images fits on TITAN XP
@@ -34,9 +37,9 @@ class Config(BaseConfig):
     pre_crop_size = 400
     crop_size = 384
     random_crop = True
-    vertical_flip = True
+    vertical_flip = False
     pixel_augment = False
-    elastic_transform = True
+    elastic_transform = False
     use_cdf = True
     augment = True
 
@@ -47,3 +50,6 @@ class Config(BaseConfig):
     balancing = False
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', no_bleeding
     probas = [0.1, 0.14, 0.14, 0.14, 0.14, 0.34]
+
+    multibranch = True
+    multibranch_embedding = 256

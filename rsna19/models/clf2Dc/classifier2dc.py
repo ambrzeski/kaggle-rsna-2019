@@ -1,4 +1,3 @@
-import pretrainedmodels
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
@@ -7,12 +6,13 @@ from torch.nn import functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 import numpy as np
-from copy import deepcopy
 
 from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.commons.balancing_sampler import BalancedBatchSampler
 import rsna19.models.commons.metrics as metrics
 from rsna19.models.commons.radam import RAdam
+from rsna19.models.commons.concat_pool import concat_pool
+from rsna19.models.commons.get_base_model import get_base_model
 
 
 class Classifier2DC(pl.LightningModule):
@@ -20,73 +20,44 @@ class Classifier2DC(pl.LightningModule):
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any'
     _CLASS_WEIGHTS = [1, 1, 1, 1, 1, 2]
 
-    def get_base_model(self, model, pretrained):
-        _available_models = ['senet154', 'se_resnet50', 'se_resnext50']
-        pretrained = 'imagenet' if pretrained else None
-
-        if model not in _available_models:
-            raise ValueError('Unavailable backbone, choose one from {}'.format(_available_models))
-
-        if model == 'senet154':
-            cut_point = -3
-            model = nn.Sequential(*list(pretrainedmodels.senet154(pretrained=pretrained).children())[:cut_point])
-
-            if self.config.num_slices != 3:
-                tmp = deepcopy(model[0].conv1.weight)
-                model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(3, 3),
-                                           stride=(2, 2), padding=(1, 1), bias=False)
-
-        elif model == 'se_resnext50':
-            cut_point = -2
-            model = nn.Sequential(*list(pretrainedmodels.se_resnext50_32x4d(pretrained=pretrained).children())[:cut_point])
-
-            if self.config.num_slices != 3:
-                tmp = deepcopy(model[0].conv1.weight)
-                model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(7, 7),
-                                           stride=(2, 2), padding=(3, 3), bias=False)
-
-        elif model == 'se_resnet50':
-            cut_point = -2
-            model = nn.Sequential(*list(pretrainedmodels.se_resnet50(pretrained=pretrained).children())[:cut_point])
-
-            if self.config.num_slices != 3:
-                tmp = deepcopy(model[0].conv1.weight)
-                model[0].conv1 = nn.Conv2d(self.config.num_slices, 64, kernel_size=(7, 7),
-                                           stride=(2, 2), padding=(3, 3), bias=False)
-
-        if self.config.num_slices != 3:
-            diff = (self.config.num_slices - 3) // 2
-
-            model[0].conv1.weight.data.fill_(0.)
-            model[0].conv1.weight[:, diff:diff+3, :, :].data.copy_(tmp)
-
-        return model
-
     def __init__(self, config):
         super(Classifier2DC, self).__init__()
-
         self.config = config
 
         self.train_folds = config.train_folds
         self.val_folds = config.val_folds
 
-        self.backbone = self.get_base_model(config.backbone, config.pretrained)
-        self.last_linear = nn.Linear(Classifier2DC._NUM_FEATURES_BACKBONE, config.n_classes)
+        self.backbone = get_base_model(config)
+        if self.config.multibranch:
+            self.combine_conv = nn.Conv2d(Classifier2DC._NUM_FEATURES_BACKBONE * config.num_slices, config.multibranch_embedding, kernel_size=1)
+            self.last_linear = nn.Linear(config.multibranch_embedding * 2, config.n_classes)
+        else:
+            self.last_linear = nn.Linear(Classifier2DC._NUM_FEATURES_BACKBONE * 2, config.n_classes)
+
         if self.config.dropout > 0:
             self.dropout = nn.Dropout(self.config.dropout)
         else:
             self.dropout = None
+
         self.scheduler = None
 
     def forward(self, x):
+        batch_in_size = x.shape[0]
+        if self.config.multibranch:
+            x = x.view(batch_in_size*self.config.num_slices, 1, x.shape[2], x.shape[3])
         x = self.backbone(x)
-        x = F.adaptive_avg_pool2d(x, 1)
-        x = x.view(x.size(0), -1)
+        if self.config.multibranch:
+            x = x.view(batch_in_size, Classifier2DC._NUM_FEATURES_BACKBONE * self.config.num_slices, x.shape[2], x.shape[3])
+            x = self.combine_conv(x)
+
+        x = concat_pool(x)
+
         if self.dropout is not None:
             x = self.dropout(x)
         x = self.last_linear(x)
         return x
 
+    # training step and validation step should return tensor or nested dicts of tensor for data parallel to work
     def training_step(self, batch, batch_nb):
         x, y = batch['image'], batch['labels']
         y_hat = self.forward(x)
@@ -101,15 +72,15 @@ class Classifier2DC(pl.LightningModule):
         y_hat = self.forward(x)
         class_weights = torch.tensor(self._CLASS_WEIGHTS, dtype=torch.float32).to(y_hat.get_device())
 
-        return {'val_loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights).cpu().numpy(),
-                'y_hat_np': torch.sigmoid(y_hat).cpu().numpy(),
-                'y_np': y.cpu().numpy()}
+        return {'val_loss': F.binary_cross_entropy_with_logits(y_hat, y, weight=class_weights),
+                'y_hat_np': torch.sigmoid(y_hat),
+                'y_np': y}
 
     def validation_end(self, outputs):
         out_dict = {}
 
-        y_hat = np.concatenate([x['y_hat_np'] for x in outputs])
-        y = np.concatenate([x['y_np'] for x in outputs])
+        y_hat = np.concatenate([x['y_hat_np'].cpu().numpy() for x in outputs])
+        y = np.concatenate([x['y_np'].cpu().numpy() for x in outputs])
 
         th = 0.5
         accuracy = metrics.accuracy(y_hat, y, th, True)
@@ -138,7 +109,7 @@ class Classifier2DC(pl.LightningModule):
             out_dict['{}_prec'.format(class_name)] = prec
             out_dict['{}_f1_spec'.format(class_name)] = f1_spec
 
-        avg_loss = np.stack([x['val_loss'] for x in outputs]).mean()
+        avg_loss = np.stack([x['val_loss'].cpu().numpy() for x in outputs]).mean()
         out_dict['avg_val_loss'] = avg_loss
 
         # implementation probably used in competition, gives slightly different results than torch
