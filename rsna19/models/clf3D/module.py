@@ -12,7 +12,7 @@ from rsna19.data.dataset_3d import IntracranialDataset3D
 from rsna19.models.commons.balancing_sampler import BalancedBatchSampler
 import rsna19.models.commons.metrics as metrics
 from rsna19.models.commons.radam import RAdam
-from rsna19.models.clf3D.model import generate_model
+from rsna19.models.clf3D.utils import generate_model
 
 
 class MedicalNetModule(pl.LightningModule):
@@ -64,8 +64,8 @@ class MedicalNetModule(pl.LightningModule):
 
         # compute per-class loss
         class_weights = torch.tensor(self._CLASS_WEIGHTS, dtype=torch.float64)
-        losses = F.binary_cross_entropy(torch.tensor(y_hat, dtype=torch.float64),torch.tensor(y, dtype=torch.float64),
-                                      weight=class_weights, reduction='none')
+        losses = F.binary_cross_entropy(torch.tensor(y_hat, dtype=torch.float64), torch.tensor(y, dtype=torch.float64),
+                                        weight=class_weights, reduction='none')
         losses = losses.mean(dim=0)
 
         classes = ['epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any']
@@ -84,12 +84,14 @@ class MedicalNetModule(pl.LightningModule):
         out_dict['avg_val_loss'] = avg_loss
 
         # implementation probably used in competition, gives slightly different results than torch
-        out_dict['val_loss_sklearn'] = log_loss(y.flatten(), y_hat.flatten(), sample_weight=self._CLASS_WEIGHTS * y.shape[0])
+        out_dict['val_loss_sklearn'] = log_loss(y.flatten(), y_hat.flatten(),
+                                                sample_weight=self._CLASS_WEIGHTS * y.shape[0])
 
         return out_dict
 
     def configure_optimizers(self):
         new_parameters = []
+        print("Layers with boosted learning rate:")
         for pname, p in self.named_parameters():
             for layer_name in self.config.new_layer_names:
                 if layer_name in pname:
