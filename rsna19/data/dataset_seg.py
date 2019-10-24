@@ -154,7 +154,14 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from rsna19.configs.se_resnext50_2dc import Config as config
 
-    dataset = IntracranialDataset(config, [0, 1, 2, 3, 4], augment=True)
+    dataset = IntracranialDataset(config, [0, 1, 2, 3], augment=True)
+
+    print(f'all: {len(dataset)}')
+    for class_ in ['any', 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural']:
+        n_samples = dataset.data[class_].sum()
+        print(f'{class_}: {int(n_samples)} ({n_samples / len(dataset) * 100:.02f}%)')
+    print()
+
     show_all_slices = False
     draw_any = False
 
