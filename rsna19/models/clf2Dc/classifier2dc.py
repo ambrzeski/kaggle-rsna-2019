@@ -29,7 +29,8 @@ class Classifier2DC(pl.LightningModule):
 
         self.backbone = get_base_model(config)
         if self.config.multibranch:
-            self.combine_conv = nn.Conv2d(Classifier2DC._NUM_FEATURES_BACKBONE * config.num_slices, config.multibranch_embedding, kernel_size=1)
+            self.combine_conv = nn.Conv2d(Classifier2DC._NUM_FEATURES_BACKBONE * config.num_slices,
+                                          config.multibranch_embedding, kernel_size=1)
             self.last_linear = nn.Linear(config.multibranch_embedding * 2, config.n_classes)
         else:
             self.last_linear = nn.Linear(Classifier2DC._NUM_FEATURES_BACKBONE * 2, config.n_classes)
@@ -41,13 +42,28 @@ class Classifier2DC(pl.LightningModule):
 
         self.scheduler = None
 
+        if self.config.freeze_backbone_iterations > 0:
+            self.freeze_backbone()
+            self.backbone_frozen = True
+        else:
+            self.backbone_frozen = False
+
+    def freeze_backbone(self):
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+
+    def unfreeze_backbone(self):
+        for param in self.backbone.parameters():
+            param.requires_grad = True
+
     def forward(self, x):
         batch_in_size = x.shape[0]
         if self.config.multibranch:
-            x = x.view(batch_in_size*self.config.num_slices, 1, x.shape[2], x.shape[3])
+            x = x.view(batch_in_size * self.config.num_slices, 1, x.shape[2], x.shape[3])
         x = self.backbone(x)
         if self.config.multibranch:
-            x = x.view(batch_in_size, Classifier2DC._NUM_FEATURES_BACKBONE * self.config.num_slices, x.shape[2], x.shape[3])
+            x = x.view(batch_in_size, Classifier2DC._NUM_FEATURES_BACKBONE * self.config.num_slices, x.shape[2],
+                       x.shape[3])
             x = self.combine_conv(x)
 
         x = concat_pool(x)
@@ -119,6 +135,10 @@ class Classifier2DC(pl.LightningModule):
         return out_dict
 
     def on_batch_start(self, batch):
+        if self.backbone_frozen and self.global_step >= self.config.freeze_backbone_iterations:
+            self.unfreeze_backbone()
+            self.backbone_frozen = False
+
         if self.config.scheduler['name'] == 'flat_anneal':
             flat_iter = self.config.scheduler['flat_iterations']
             anneal_iter = self.config.scheduler['anneal_iterations']
