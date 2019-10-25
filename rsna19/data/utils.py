@@ -16,6 +16,7 @@ from rsna19.configs.base_config import BaseConfig
 
 DICOM_TAGS_DF_PATH = '/kolos/m2/ct/data/rsna/df.pkl'
 HU_AIR = -1000
+CLASSES = ["epidural", "intraparenchymal", "intraventricular", "subarachnoid", "subdural"]
 
 
 def load_dicom_tags():
@@ -151,7 +152,18 @@ def draw_seg(img, seg, draw_any=False):
 
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR).astype(np.float32)
     for class_, color in colors.items():
-        img[seg[class_] > 0] += color
-        img[seg[class_] > 0] /= 2
+        img[seg[class_] > 0.5] += color
+        img[seg[class_] > 0.5] /= 2
+
+    step = 25
+    counter = 0
+
+    for class_, color in colors.items():
+        if img[seg[class_] > 0.5].sum() > 0:
+            cv2.circle(img, (step, step // 2 + counter * step),
+                       step // 2, color, -1)
+            cv2.putText(img, CLASSES[class_], (2 * step, step // 2 + counter * step),
+                        cv2.FONT_HERSHEY_SIMPLEX, .5, color)
+            counter += 1
 
     return np.uint8(img)
