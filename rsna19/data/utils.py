@@ -167,3 +167,26 @@ def draw_seg(img, seg, draw_any=False):
             counter += 1
 
     return np.uint8(img)
+
+
+def draw_labels(img, labels):
+    """
+    Draw colored image labels on image.
+    :param img: image to draw labels on
+    :param labels: list/array of 5 boolean or 0-1 values, e.g.: [0, 1, 0, 1, 1]
+    """
+    class_colors = {
+        "epidural": (255, 237, 0),
+        "intraparenchymal": (212, 36, 0),
+        "intraventricular": (173, 102, 108),
+        "subarachnoid": (0, 48, 114),
+        "subdural": (74, 87, 50)
+    }
+    step = 25
+    counter = 0
+
+    for i, c in enumerate(class_colors.keys()):
+        if labels[i]:
+            cv2.circle(img, (step, step // 2 + counter * step), step // 2, class_colors[c], -1)
+            cv2.putText(img, c, (2 * step, step // 2 + counter * step), cv2.FONT_HERSHEY_SIMPLEX, .5, class_colors[c])
+            counter += 1
