@@ -2,6 +2,7 @@ import argparse
 import collections
 import os
 
+import adabound as adabound
 import numpy as np
 import torch
 import torch.optim as optim
@@ -19,7 +20,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from rsna19.configs.base_config import BaseConfig
 from rsna19.models.commons import radam
-from rsna19.models.clf2D.experiments import MODELS
+from rsna19.models.clf3D.experiments_3d import MODELS
 from torch.utils.tensorboard import SummaryWriter
 
 from rsna19.models.clf2D.train import build_model_str, log_metrics
@@ -75,13 +76,18 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         csv_file='5fold.csv',
         folds=[fold],
         random_slice=False,
-        # return_all_slices=True,
+        return_all_slices=True,
         preprocess_func=albumentations.pytorch.ToTensorV2(),
-        **{**model_info.dataset_args, 'num_slices': 32}
+        **model_info.dataset_args
     )
 
     model.train()
-    optimizer = radam.RAdam(model.parameters(), lr=model_info.initial_lr)
+    if model_info.optimiser == 'radam':
+        optimizer = radam.RAdam(model.parameters(), lr=model_info.initial_lr)
+    elif model_info.optimiser == 'sgd':
+        optimizer = torch.optim.SGD(model.parameters(), lr=model_info.initial_lr, momentum=0.95, nesterov=True)
+    elif model_info.optimiser == 'adabound':
+        optimizer = adabound.AdaBound(model.parameters(), lr=model_info.initial_lr, final_lr=0.1)
 
     milestones = [32, 48, 64]
     if model_info.optimiser_milestones:
@@ -96,14 +102,17 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     data_loaders = {
-        'train': DataLoader(dataset_train,
-                            num_workers=16,
-                            shuffle=True,
-                            batch_size=model_info.batch_size),
-        'val':   DataLoader(dataset_valid,
-                            shuffle=False,
-                            num_workers=16,
-                            batch_size=2)
+        'train': DataLoader(
+            dataset_train,
+            num_workers=16,
+            shuffle=True,
+            drop_last=True,
+            batch_size=model_info.batch_size),
+        'val': DataLoader(
+            dataset_valid,
+            shuffle=False,
+            num_workers=4,
+            batch_size=1)
     }
 
     class_weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 1.0, 2.0]).cuda()
@@ -122,7 +131,8 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         pre_fit_steps = len(dataset_train) // model_info.batch_size // 2
         data_iter = tqdm(enumerate(data_loader), total=pre_fit_steps)
         epoch_loss = []
-        initial_optimizer = radam.RAdam(model.parameters(), lr=1e-3)
+        #initial_optimizer = radam.RAdam(model.parameters(), lr=1e-3)
+        initial_optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
         for iter_num, data in data_iter:
             if iter_num > pre_fit_steps:
                 break
@@ -131,74 +141,97 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 labels = data['labels'].float().cuda()
                 pred = model(img)
                 loss = criterium(pred, labels)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
-                initial_optimizer.step()
-                initial_optimizer.zero_grad()
+                # loss.backward()
+                (loss / model_info.accumulation_steps).backward()
+                if (iter_num + 1) % model_info.accumulation_steps == 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
+                    initial_optimizer.step()
+                    initial_optimizer.zero_grad()
                 epoch_loss.append(float(loss))
 
                 data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-100:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
     model.module.unfreeze_encoder()
 
+    phase_period = {
+        'train': 1,
+        'val': 4,
+        'val_prev': 8,
+    }
+
     for epoch_num in range(resume_epoch+1, 128):
         for phase in ['train', 'val']:
-            model.train(phase == 'train')
-            epoch_loss = []
-            epoch_labels = []
-            epoch_predictions = []
-            epoch_sample_paths = []
+            if epoch_num % phase_period[phase] == 0:
+                model.train(phase == 'train')
+                epoch_loss = []
+                epoch_labels = []
+                epoch_predictions = []
+                epoch_sample_paths = []
 
-            if 'on_epoch' in model.module.__dir__():
-                model.module.on_epoch(epoch_num)
+                if 'on_epoch' in model.module.__dir__():
+                    model.module.on_epoch(epoch_num)
 
-            data_loader = data_loaders[phase]
-            data_iter = tqdm(enumerate(data_loader), total=len(data_loader))
-            for iter_num, data in data_iter:
-                img = data['image'].float().cuda()
-                labels = data['labels'].float().cuda()
+                data_loader = data_loaders[phase]
+                data_iter = tqdm(enumerate(data_loader), total=len(data_loader))
+                for iter_num, data in data_iter:
+                    img = data['image'].float().cuda()
+                    labels = data['labels'].float().cuda()
 
-                with torch.set_grad_enabled(phase == 'train'):
-                    pred = model(img)
-                    loss = criterium(pred, labels)
+                    with torch.set_grad_enabled(phase == 'train'):
+                        pred = model(img)
+                        loss = criterium(pred, labels)
 
-                    if phase == 'train':
-                        (loss / model_info.accumulation_steps).backward()
-                        if (iter_num + 1) % model_info.accumulation_steps == 0:
-                            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                            optimizer.step()
-                            optimizer.zero_grad()
+                        if phase == 'train':
+                            (loss / model_info.accumulation_steps).backward()
+                            if (iter_num + 1) % model_info.accumulation_steps == 0:
+                                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                                optimizer.step()
+                                optimizer.zero_grad()
 
-                    epoch_loss.append(float(loss))
+                        epoch_loss.append(float(loss))
 
-                    epoch_labels.append(labels.detach().cpu().numpy())
-                    epoch_predictions.append(torch.sigmoid(pred).detach().cpu().numpy())
-                    epoch_sample_paths += data['path']
+                        epoch_labels.append(np.row_stack(labels.detach().cpu().numpy()))
+                        epoch_predictions.append(np.row_stack(torch.sigmoid(pred).detach().cpu().numpy()))
 
-                data_iter.set_description(
-                    f'{epoch_num} Loss: Running {np.mean(epoch_loss[-100:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
+                        # print(labels.shape, epoch_labels[-1].shape, pred.shape, epoch_predictions[-1].shape)
+                        epoch_sample_paths += data['path']
 
-            epoch_labels = np.row_stack(epoch_labels)
-            epoch_predictions = np.row_stack(epoch_predictions)
+                    data_iter.set_description(
+                        f'{epoch_num} Loss: Running {np.mean(epoch_loss[-100:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
 
-            logger.add_scalar(f'loss_{phase}', np.mean(epoch_loss), epoch_num)
-            logger.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch_num)  # scheduler.get_lr()[0]
-            try:
-                log_metrics(logger=logger, phase=phase, epoch_num=epoch_num, y=epoch_labels, y_hat=epoch_predictions)
-            except Exception:
-                pass
+                epoch_labels = np.row_stack(epoch_labels)
+                epoch_predictions = np.row_stack(epoch_predictions)
+                if phase == 'val':
+                    # recalculate loss as depth dimension is variable
+                    epoch_loss_mean = float(F.binary_cross_entropy(
+                        torch.from_numpy(epoch_predictions).cuda(),
+                        torch.from_numpy(epoch_labels).cuda(),
+                        class_weights.repeat(epoch_labels.shape[0], 1)
+                    ))
+                    print(epoch_loss_mean)
+                    logger.add_scalar(f'loss_{phase}', epoch_loss_mean, epoch_num)
+                else:
+                    logger.add_scalar(f'loss_{phase}', np.mean(epoch_loss), epoch_num)
+                logger.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch_num)  # scheduler.get_lr()[0]
+                try:
+                    log_metrics(logger=logger, phase=phase, epoch_num=epoch_num, y=epoch_labels, y_hat=epoch_predictions)
+                except Exception:
+                    pass
+
+                if phase == 'val':
+                    torch.save(
+                        {
+                            'epoch': epoch_num,
+                            'sample_paths': epoch_sample_paths,
+                            'epoch_labels': epoch_labels,
+                            'epoch_predictions': epoch_predictions,
+                        },
+                        f'{oof_dir}/{epoch_num:03}.pt'
+                    )
+
             logger.flush()
 
             if phase == 'val':
                 scheduler.step(epoch=epoch_num)
-                torch.save(
-                    {
-                        'epoch': epoch_num,
-                        'sample_paths': epoch_sample_paths,
-                        'epoch_labels': epoch_labels,
-                        'epoch_predictions': epoch_predictions,
-                    },
-                    f'{oof_dir}/{epoch_num:03}.pt'
-                )
             else:
                 # print(f'{checkpoints_dir}/{epoch_num:03}.pt')
                 torch.save(
@@ -209,117 +242,6 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                     },
                     f'{checkpoints_dir}/{epoch_num:03}.pt'
                 )
-
-
-def check_heatmap(model_name, fold, epoch, run=None):
-    model_str = build_model_str(model_name, fold, run)
-    model_info = MODELS[model_name]
-
-    checkpoints_dir = f'{BaseConfig.checkpoints_dir}/{model_str}'
-    print('\n', model_name, '\n')
-
-    model = model_info.factory(**model_info.args)
-    model = model.cpu()
-
-    dataset_valid = dataset.IntracranialDataset(
-        csv_file='5fold.csv',
-        folds=[fold],
-        preprocess_func=albumentations.pytorch.ToTensorV2(),
-        **model_info.dataset_args
-    )
-
-    model.eval()
-    checkpoint = torch.load(f'{checkpoints_dir}/{epoch:03}.pt')
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model = model.cpu()
-
-    batch_size = 1
-
-    data_loader = DataLoader(dataset_valid,
-                          shuffle=False,
-                          num_workers=16,
-                          batch_size=batch_size)
-
-    data_iter = tqdm(enumerate(data_loader), total=len(data_loader))
-    for iter_num, data in data_iter:
-        img = data['image'].float().cpu()
-        labels = data['labels'].detach().numpy()
-
-        with torch.set_grad_enabled(False):
-            pred2d, heatmap, pred = model(img, output_heatmap=True, output_per_pixel=True)
-            heatmap *= np.prod(heatmap.shape[1:])
-
-            pred2d = (pred2d[0]).detach().cpu().numpy() * 0.1
-
-            fig, ax = plt.subplots(2, 4)
-
-            for i in range(batch_size):
-                print(labels[i], torch.sigmoid(pred[i]))
-                ax[0, 0].imshow(img[i, 0].cpu().detach().numpy(), cmap='gray')
-                ax[0, 1].imshow(heatmap[i, 0].cpu().detach().numpy(), cmap='gray')
-                ax[0, 2].imshow(pred2d[0], cmap='gray', vmin=0, vmax=1)
-                ax[0, 3].imshow(pred2d[1], cmap='gray', vmin=0, vmax=1)
-                ax[1, 0].imshow(pred2d[2], cmap='gray', vmin=0, vmax=1)
-                ax[1, 1].imshow(pred2d[3], cmap='gray', vmin=0, vmax=1)
-                ax[1, 2].imshow(pred2d[4], cmap='gray', vmin=0, vmax=1)
-                ax[1, 3].imshow(pred2d[5], cmap='gray', vmin=0, vmax=1)
-
-            plt.show()
-
-
-def check_windows(model_name, fold, epoch, run=None):
-    model_str = build_model_str(model_name, fold, run)
-    model_info = MODELS[model_name]
-
-    checkpoints_dir = f'{BaseConfig.checkpoints_dir}/{model_str}'
-    print('\n', model_name, '\n')
-
-    model = model_info.factory(**model_info.args)
-    model = model.cpu()
-
-    dataset_valid = dataset.IntracranialDataset(
-        csv_file='5fold.csv',
-        folds=[fold],
-        preprocess_func=albumentations.pytorch.ToTensorV2(),
-        **model_info.dataset_args
-    )
-
-    model.eval()
-    checkpoint = torch.load(f'{checkpoints_dir}/{epoch:03}.pt')
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model = model.cpu()
-
-    w = model.windows_conv.weight.detach().cpu().numpy().flatten()
-    b = model.windows_conv.bias.detach().cpu().numpy()
-    print(w, b)
-    for wi, bi in zip(w, b):
-        print(f'{-int(bi/wi*1000)} +- {int(abs(1000/wi))}')
-
-    batch_size = 1
-
-    data_loader = DataLoader(dataset_valid,
-                          shuffle=False,
-                          num_workers=16,
-                          batch_size=batch_size)
-
-    data_iter = tqdm(enumerate(data_loader), total=len(data_loader))
-    for iter_num, data in data_iter:
-        img = data['image'].float().cpu()
-        labels = data['labels'].detach().numpy()
-
-        with torch.set_grad_enabled(False):
-            windowed_img = model.windows_conv(img)
-            windowed_img = F.relu6(windowed_img).cpu().numpy()
-
-            fig, ax = plt.subplots(4, 4)
-
-            for batch in range(batch_size):
-                print(labels[batch], data['path'][batch])
-                for j in range(4):
-                    for k in range(4):
-                        ax[j, k].imshow(windowed_img[batch, j*4+k], cmap='gray')
-
-            plt.show()
 
 
 def check_score(model_name, fold, epoch, run=None):
@@ -398,12 +320,6 @@ if __name__ == '__main__':
             train(model_name=args.model, run=args.run, fold=args.fold, resume_epoch=args.resume_epoch)
         except KeyboardInterrupt:
             pass
-
-    if action == 'check_heatmap':
-        check_heatmap(model_name=args.model, run=args.run, fold=args.fold, epoch=args.epoch)
-
-    if action == 'check_windows':
-        check_windows(model_name=args.model, run=args.run, fold=args.fold, epoch=args.epoch)
 
     if action == 'check_score':
         check_score(model_name=args.model, run=args.run, fold=args.fold, epoch=args.epoch)

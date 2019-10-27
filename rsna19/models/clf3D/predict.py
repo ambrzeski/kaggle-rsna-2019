@@ -9,7 +9,7 @@ import pandas as pd
 
 from rsna19.data import dataset_3d
 from rsna19.configs.base_config import BaseConfig
-from rsna19.models.clf2D.experiments import MODELS
+from rsna19.models.clf3D.experiments_3d import MODELS
 from rsna19.models.clf2D.train import build_model_str
 import albumentations
 import albumentations.pytorch
