@@ -16,7 +16,7 @@ from rsna19.configs.base_config import BaseConfig
 
 DICOM_TAGS_DF_PATH = '/kolos/m2/ct/data/rsna/df.pkl'
 HU_AIR = -1000
-CLASSES = ["epidural", "intraparenchymal", "intraventricular", "subarachnoid", "subdural"]
+CLASSES = ["epidural", "intraparenchymal", "intraventricular", "subarachnoid", "subdural", "any"]
 
 
 def load_dicom_tags():
