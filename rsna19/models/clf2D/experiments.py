@@ -16,8 +16,14 @@ class ModelInfo:
                  accumulation_steps=1,
                  weight_decay=0,
                  is_pretrained=True,
-                 use_3d=False
+                 use_3d=False,
+                 clip_grad=1.0,
+                 single_slice_steps=0,
+                 freeze_bn_step=-1
                  ):
+        self.freeze_bn_step = freeze_bn_step
+        self.single_slice_steps = single_slice_steps
+        self.clip_grad = clip_grad
         self.use_3d = use_3d
         self.nb_slices = nb_slices
         self.is_pretrained = is_pretrained
@@ -489,5 +495,47 @@ MODELS = {
         optimiser='radam',
         initial_lr=1e-4,
         accumulation_steps=4
+    ),
+
+    'resnet34_400_5_planes_combine_last_var': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'resnet34_400_5_planes_combine_last_var7': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2,
+        single_slice_steps=7
+    ),
+
+    'resnet34_400_5_planes_combine_last_var_freeze_bn5': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2,
+        single_slice_steps=6,
     ),
 }

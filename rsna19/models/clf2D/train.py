@@ -84,7 +84,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         csv_file='5fold.csv',
         folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
         preprocess_func=albumentations.Compose([
-            albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
+            albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.05, rotate_limit=30,
                                             interpolation=cv2.INTER_LINEAR,
                                             border_mode=cv2.BORDER_REPLICATE,
                                             p=0.80),
@@ -102,6 +102,51 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         **model_info.dataset_args
     )
 
+    data_loaders = {
+        'train': DataLoader(dataset_train,
+                            num_workers=8,
+                            shuffle=True,
+                            batch_size=model_info.batch_size),
+        'val':   DataLoader(dataset_valid,
+                            shuffle=False,
+                            num_workers=8,
+                            batch_size=model_info.batch_size)
+    }
+
+    if model_info.single_slice_steps > 0:
+        dataset_train_1_slice = dataset.IntracranialDataset(
+            csv_file='5fold.csv',
+            folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
+            preprocess_func=albumentations.Compose([
+                albumentations.ShiftScaleRotate(shift_limit=16. / 256, scale_limit=0.05, rotate_limit=30,
+                                                interpolation=cv2.INTER_LINEAR,
+                                                border_mode=cv2.BORDER_REPLICATE,
+                                                p=0.80),
+                albumentations.Flip(),
+                albumentations.RandomRotate90(),
+                albumentations.pytorch.ToTensorV2()
+            ]),
+            **{**model_info.dataset_args, "num_slices": 1}
+        )
+
+        dataset_valid_1_slice = dataset.IntracranialDataset(
+            csv_file='5fold.csv',
+            folds=[fold],
+            preprocess_func=albumentations.pytorch.ToTensorV2(),
+            **{**model_info.dataset_args, "num_slices": 1}
+        )
+
+        data_loaders['train_1_slice'] = DataLoader(
+            dataset_train_1_slice,
+            num_workers=8,
+            shuffle=True,
+            batch_size=model_info.batch_size)
+        data_loaders['val_1_slice'] = DataLoader(
+            dataset_valid_1_slice,
+            shuffle=False,
+            num_workers=8,
+            batch_size=model_info.batch_size)
+
     model.train()
     optimizer = radam.RAdam(model.parameters(), lr=model_info.initial_lr)
 
@@ -117,17 +162,6 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         model.module.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-    data_loaders = {
-        'train': DataLoader(dataset_train,
-                            num_workers=16,
-                            shuffle=True,
-                            batch_size=model_info.batch_size),
-        'val':   DataLoader(dataset_valid,
-                            shuffle=False,
-                            num_workers=16,
-                            batch_size=model_info.batch_size)
-    }
-
     class_weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 1.0, 2.0]).cuda()
 
     def criterium(y_pred,y_true):
@@ -139,11 +173,11 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     if resume_epoch == -1 and model_info.is_pretrained:
         model.train()
         model.module.freeze_encoder()
-        data_loader = data_loaders['train']
+        data_loader = data_loaders.get('train_1_slice', data_loaders['train'])
         pre_fit_steps = 50000 // model_info.batch_size
         data_iter = tqdm(enumerate(data_loader), total=pre_fit_steps)
         epoch_loss = []
-        initial_optimizer = radam.RAdam(model.parameters(), lr=1e-3)
+        initial_optimizer = radam.RAdam(model.parameters(), lr=1e-4)
         for iter_num, data in data_iter:
             if iter_num > pre_fit_steps:
                 break
@@ -172,14 +206,38 @@ def train(model_name, fold, run=None, resume_epoch=-1):
             if 'on_epoch' in model.module.__dir__():
                 model.module.on_epoch(epoch_num)
 
-            data_loader = data_loaders[phase]
+            if epoch_num < model_info.single_slice_steps:
+                data_loader = data_loaders[phase+'_1_slice']
+                print("use 1 slice input")
+            else:
+                data_loader = data_loaders[phase]
+                print("use N slices input")
+
+            # if epoch_num == model_info.single_slice_steps:
+            #     print("train only conv slices/fn layers")
+            #     model.module.freeze_encoder_full()
+            #
+            # if epoch_num == model_info.single_slice_steps+1:
+            #     print("train all")
+            #     model.module.unfreeze_encoder()
+            #
+            # if -1 < model_info.freeze_bn_step <= epoch_num:
+            #     print("freeze bn")
+            #     model.module.freeze_bn()
+
             data_iter = tqdm(enumerate(data_loader), total=len(data_loader))
             for iter_num, data in data_iter:
                 img = data['image'].float().cuda()
                 labels = data['labels'].float().cuda()
 
                 with torch.set_grad_enabled(phase == 'train'):
-                    pred = model(img)
+                    if epoch_num == model_info.single_slice_steps and phase == 'train':
+                        with torch.set_grad_enabled(False):
+                            model_x = model(img, output_before_combine_slices=True)
+                        with torch.set_grad_enabled(True):
+                            pred = model(model_x.detach(), train_last_layers_only=True)
+                    else:
+                        pred = model(img)
                     loss = criterium(pred, labels)
 
                     if phase == 'train':
