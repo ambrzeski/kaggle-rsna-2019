@@ -36,7 +36,7 @@ class PredictionModel:
         self.model.eval()
 
     def __call__(self, x):
-        y = self.model.forward(x)
+        y = self.model.predict(x)
         return y
 
 
@@ -67,7 +67,7 @@ def main():
             img = np.uint8((img.numpy()[config.num_slices // 2] + 1) * 127.5)
             img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
             draw_labels(img_rgb, batch['labels'][i] > 0.5)
-            predictions = draw_seg(img, y_batched[i])
+            predictions = draw_seg(img, y_batched[i], draw_any=True)
             labels = draw_seg(img, batch['seg'][i].numpy())
             path = Path(batch['path'][i])
 
