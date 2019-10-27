@@ -14,15 +14,19 @@ from rsna19.configs import load
 from rsna19.data.utils import draw_seg, draw_labels
 
 
-MODEL = '/kolos/m2/ct/models/classification/rsna/seg0001_ours/0123/version_0/models/_ckpt_epoch_30.ckpt'
+MODEL = '/kolos/m2/ct/models/classification/rsna/seg0001_ours/1234/version_2/models/_ckpt_epoch_35.ckpt'
+# MODEL = '/kolos/m2/ct/models/classification/rsna/seg0001_ours/0234/version_2/models/_ckpt_epoch_48.ckpt'
+# MODEL = '/kolos/m2/ct/models/classification/rsna/seg0001_ours/0134/version_2/models/_ckpt_epoch_60.ckpt'
+# MODEL = '/kolos/m2/ct/models/classification/rsna/seg0001_ours/0124/version_2/models/_ckpt_epoch_27.ckpt'
+# MODEL = '/kolos/m2/ct/models/classification/rsna/seg0001_ours/0123/version_2/models/_ckpt_epoch_52.ckpt'
 GPU = 0
-BATCH_SIZE = 32
-OUT_DIR = '/kolos/m2/ct/data/rsna/seg_visualization/fold4/'
+BATCH_SIZE = 100
+OUT_DIR = '/kolos/m2/ct/data/rsna/seg_visualization/fold{folds}'
 
 
 class PredictionModel:
 
-    def __init__(self, model_path, config=None):
+    def __init__(self, model_path, gpu):
         print(f'Loading "{model_path}"...')
 
         # Model
@@ -31,8 +35,10 @@ class PredictionModel:
         self.model = SegmentationModel(self.config)
 
         # Checkpoint
-        checkpoint = torch.load(model_path, map_location=f'cuda:{GPU}')
+        device = torch.device(gpu)
+        checkpoint = torch.load(model_path, map_location=device)
         self.model.load_state_dict(checkpoint['state_dict'])
+        self.model.to(device)
         self.model.eval()
 
     def __call__(self, x):
@@ -42,7 +48,7 @@ class PredictionModel:
 
 def main():
     # Prepare model
-    prediction_model = PredictionModel(MODEL)
+    prediction_model = PredictionModel(MODEL, GPU)
 
     # Prepare data
     config = Config()
@@ -52,7 +58,7 @@ def main():
     loader = DataLoader(
         dataset=seg_dataset,
         batch_size=BATCH_SIZE,
-        num_workers=2
+        num_workers=4
     )
 
     counter = 0
@@ -60,7 +66,7 @@ def main():
     # Run prediction
     for batch in tqdm(loader):
 
-        y_batched = prediction_model(batch['image']).detach().cpu().numpy()
+        y_batched = prediction_model(batch['image'].to(torch.device(GPU))).detach().cpu().numpy()
 
         for i, img in enumerate(batch['image']):
 
@@ -74,7 +80,9 @@ def main():
             drawing = np.concatenate((img_rgb, labels), axis=1)
             drawing = np.concatenate((drawing, predictions), axis=1)
 
-            save_dir = Path(OUT_DIR)
+            val_folds_str = "".join(map(str, prediction_model.model.val_folds))
+            out_dir = OUT_DIR.format(folds=val_folds_str)
+            save_dir = Path(out_dir)
             os.makedirs(save_dir, exist_ok=True)
             cv2.imwrite(str(save_dir/f'{counter:05d}_{path.parts[-3]}_{Path(path.parts[-1]).stem}.png'), drawing)
             # cv2.imshow('img', drawing)
