@@ -7,7 +7,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from test_tube import Experiment
 
 from rsna19.models.clf2Dc.classifier2dc import Classifier2DC
-from rsna19.configs.se_resnext50_2dc import Config
+from rsna19.configs.clf2Dc import Config
 
 
 def main():
@@ -36,7 +36,8 @@ def main():
                       gpus=config.gpus,
                       nb_sanity_val_steps=20,
                       val_check_interval=0.25,
-                      row_log_interval=1000
+                      row_log_interval=1000,
+                      accumulate_grad_batches=config.accumulate_grad_batches
                       )
 
     trainer.fit(model)

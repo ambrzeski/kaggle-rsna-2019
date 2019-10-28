@@ -21,7 +21,7 @@ class IntracranialDataset3D(IntracranialDataset):
 
 
 def main():
-    from rsna19.configs.se_resnext50_2dc import Config
+    from rsna19.configs.clf2Dc import Config
 
     for x in IntracranialDataset3D(Config(), folds=[0, 1, 2, 3], augment=True):
         print(x['image'].shape)

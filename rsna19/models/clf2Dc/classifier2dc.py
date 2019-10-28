@@ -1,13 +1,16 @@
+import itertools
+
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from sklearn.metrics import log_loss
 from torch.nn import functional as F
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
 from torch.utils.data import DataLoader
 import numpy as np
 
 from rsna19.data.dataset_2dc import IntracranialDataset
+from rsna19.models.commons.attention import ContextualAttention, SpatialAttention
 from rsna19.models.commons.balancing_sampler import BalancedBatchSampler
 import rsna19.models.commons.metrics as metrics
 from rsna19.models.commons.radam import RAdam
@@ -16,7 +19,6 @@ from rsna19.models.commons.get_base_model import get_base_model
 
 
 class Classifier2DC(pl.LightningModule):
-    _NUM_FEATURES_BACKBONE = 2048
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any'
     _CLASS_WEIGHTS = [1, 1, 1, 1, 1, 2]
 
@@ -27,18 +29,29 @@ class Classifier2DC(pl.LightningModule):
         self.train_folds = config.train_folds
         self.val_folds = config.val_folds
 
-        self.backbone = get_base_model(config)
-        if self.config.multibranch:
-            self.combine_conv = nn.Conv2d(Classifier2DC._NUM_FEATURES_BACKBONE * config.num_slices,
+        self.backbone, self.num_features_backbone = get_base_model(config)
+
+        if self.config.multibranch3d:
+            self.combine_conv = nn.Conv3d(self.num_features_backbone,
+                                          config.multibranch_embedding, kernel_size=3)
+            self.last_linear = nn.Linear(config.multibranch_embedding, config.n_classes)
+        elif self.config.multibranch:
+            self.combine_conv = nn.Conv2d(self.num_features_backbone * config.num_branches,
                                           config.multibranch_embedding, kernel_size=1)
             self.last_linear = nn.Linear(config.multibranch_embedding * 2, config.n_classes)
         else:
-            self.last_linear = nn.Linear(Classifier2DC._NUM_FEATURES_BACKBONE * 2, config.n_classes)
+            self.last_linear = nn.Linear(self.num_features_backbone * 2, config.n_classes)
 
         if self.config.dropout > 0:
             self.dropout = nn.Dropout(self.config.dropout)
         else:
             self.dropout = None
+
+        if self.config.multibranch:
+            if self.config.contextual_attention:
+                self.contextual_attention = ContextualAttention(self.num_features_backbone)
+            if self.config.spatial_attention:
+                self.spatial_attention = SpatialAttention(self.num_features_backbone)
 
         self.scheduler = None
 
@@ -49,24 +62,59 @@ class Classifier2DC(pl.LightningModule):
             self.backbone_frozen = False
 
     def freeze_backbone(self):
+        self.backbone.eval()
         for param in self.backbone.parameters():
             param.requires_grad = False
 
+        if not self.config.freeze_first_layer:
+            try:
+                conv1 = self.backbone[0].conv1
+                bn = self.backbone[0].bn1
+            except AttributeError:
+                conv1 = self.backbone[0]
+                bn = self.backbone[1]
+
+            for param in itertools.chain(conv1.parameters(), bn.parameters()):
+                param.requires_grad = True
+
     def unfreeze_backbone(self):
+        self.backbone.train()
         for param in self.backbone.parameters():
             param.requires_grad = True
 
     def forward(self, x):
-        batch_in_size = x.shape[0]
         if self.config.multibranch:
-            x = x.view(batch_in_size * self.config.num_slices, 1, x.shape[2], x.shape[3])
-        x = self.backbone(x)
-        if self.config.multibranch:
-            x = x.view(batch_in_size, Classifier2DC._NUM_FEATURES_BACKBONE * self.config.num_slices, x.shape[2],
-                       x.shape[3])
-            x = self.combine_conv(x)
+            batch_in_size = x.shape[0]
 
-        x = concat_pool(x)
+            if self.config.multibranch_channel_indices is not None:
+                x = x[:, self.config.multibranch_channel_indices, :, :]
+
+            x = x.view(batch_in_size * self.config.num_branches, self.config.multibranch_input_channels,
+                       x.shape[2], x.shape[3])
+            x = self.backbone(x)
+            x = x.view(batch_in_size, self.config.num_branches, self.num_features_backbone, x.shape[2], x.shape[3])
+
+            if self.config.contextual_attention:
+                x = self.contextual_attention(x)
+
+            if self.config.spatial_attention:
+                x = self.spatial_attention(x)
+
+            if self.config.multibranch3d:
+                # transform to (N, C, D, H, W), where D is num_branches
+                x = x.transpose(1, 2)
+
+                x = self.combine_conv(x)
+                x = F.adaptive_avg_pool3d(x, 1)
+                x = x.view(x.shape[0], -1)
+
+            else:
+                x = x.view(batch_in_size, self.config.num_branches * self.num_features_backbone, x.shape[3], x.shape[4])
+                x = self.combine_conv(x)
+                x = concat_pool(x)
+        else:
+            x = self.backbone(x)
+            x = concat_pool(x)
 
         if self.dropout is not None:
             x = self.dropout(x)
@@ -144,16 +192,32 @@ class Classifier2DC(pl.LightningModule):
             anneal_iter = self.config.scheduler['anneal_iterations']
             if flat_iter <= self.global_step < flat_iter + anneal_iter:
                 self.scheduler.step()
+        elif self.scheduler is not None:
+            self.scheduler.step()
 
     def configure_optimizers(self):
+        initial_lr = 1 if self.config.scheduler['name'] == 'LambdaLR' else self.config.lr
+
         if self.config.optimizer == 'adam':
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+            optimizer = torch.optim.Adam(self.parameters(), lr=initial_lr, weight_decay=self.config.weight_decay)
         elif self.config.optimizer == 'radam':
-            optimizer = RAdam(self.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+            optimizer = RAdam(self.parameters(), lr=initial_lr, weight_decay=self.config.weight_decay)
 
         if self.config.scheduler['name'] == 'flat_anneal':
             self.scheduler = CosineAnnealingLR(optimizer, self.config.scheduler['anneal_iterations'],
                                                self.config.scheduler['min_lr'])
+        elif self.config.scheduler['name'] == 'LambdaLR':
+            iter_to_lr = self.config.scheduler['iter_to_lr']
+
+            def f(iter):
+                lr = iter_to_lr[0]
+                for k, v in iter_to_lr.items():
+                    if k > iter:
+                        break
+                    lr = v
+                return lr
+
+            self.scheduler = LambdaLR(optimizer, f)
 
         return optimizer
 
