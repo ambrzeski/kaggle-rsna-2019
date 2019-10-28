@@ -7,7 +7,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from test_tube import Experiment
 
 from rsna19.models.clf3D.module import MedicalNetModule 
-from rsna19.configs.resnet34_3d import Config
+from rsna19.configs.clf3D import Config
 
 
 def main():
