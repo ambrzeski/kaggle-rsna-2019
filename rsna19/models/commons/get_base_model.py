@@ -6,7 +6,7 @@ import pretrainedmodels
 
 
 def get_base_model(config):
-    model = config.backbone
+    model_name = config.backbone
     pretrained = config.pretrained
 
     if pretrained is not None and pretrained != 'imagenet':
@@ -15,49 +15,64 @@ def get_base_model(config):
     else:
         weights_path = None
 
-    _available_models = ['senet154', 'se_resnet50', 'se_resnext50']
-
     if config.multibranch:
-        input_channels = 1
+        input_channels = config.multibranch_input_channels
     else:
         input_channels = config.num_slices
 
-    if model not in _available_models:
-        raise ValueError('Unavailable backbone, choose one from {}'.format(_available_models))
+    _available_models = ['senet154', 'se_resnext50', 'resnet34', 'resnet18']
 
-    if model == 'senet154':
+    if model_name == 'senet154':
         cut_point = -3
         model = nn.Sequential(*list(pretrainedmodels.senet154(pretrained=pretrained).children())[:cut_point])
-
-        if input_channels != 3:
-            conv1_weights = deepcopy(model[0].conv1.weight)
-            model[0].conv1 = nn.Conv2d(input_channels, 64, kernel_size=(3, 3),
-                                       stride=(2, 2), padding=(1, 1), bias=False)
-
-    if model == 'se_resnext50':
+        num_features = 2048
+    elif model_name == 'se_resnext50':
         cut_point = -2
         model = nn.Sequential(*list(pretrainedmodels.se_resnext50_32x4d(pretrained=pretrained).children())[:cut_point])
-
-        if input_channels != 3:
-            conv1_weights = deepcopy(model[0].conv1.weight)
-            model[0].conv1 = nn.Conv2d(input_channels, 64, kernel_size=(7, 7),
-                                       stride=(2, 2), padding=(3, 3), bias=False)
-
-    if weights_path is None:
-        if input_channels == 1:
-            model[0].conv1.weight.data.fill_(0.)
-            model[0].conv1.weight[:, 0, :, :].data.copy_(conv1_weights[:, 0, :, :])
-        elif input_channels > 3 and not config.multibranch:
-            diff = (input_channels - 3) // 2
-
-            model[0].conv1.weight.data.fill_(0.)
-            model[0].conv1.weight[:, diff:diff + 3, :, :].data.copy_(conv1_weights)
-
+        num_features = 2048
+    elif model_name == 'resnet34':
+        cut_point = -2
+        model = nn.Sequential(*list(pretrainedmodels.resnet34(pretrained=pretrained).children())[:cut_point])
+        num_features = 512
+    elif model_name == 'resnet18':
+        cut_point = -2
+        model = nn.Sequential(*list(pretrainedmodels.resnet18(pretrained=pretrained).children())[:cut_point])
+        num_features = 512
     else:
+        raise ValueError('Unavailable backbone, choose one from {}'.format(_available_models))
+
+    if model_name in ['senet154', 'se_resnext50']:
+        conv1 = model[0].conv1
+    else:
+        conv1 = model[0]
+
+    if input_channels != 3:
+        conv1_weights = deepcopy(conv1.weight)
+        new_conv1 = nn.Conv2d(input_channels, conv1.out_channels, kernel_size=conv1.kernel_size,
+                              stride=conv1.stride, padding=conv1.padding, bias=conv1.bias)
+
+        if weights_path is None:
+            if input_channels == 1:
+                new_conv1.weight.data.fill_(0.)
+                new_conv1.weight[:, 0, :, :].data.copy_(conv1_weights[:, 0, :, :])
+            elif input_channels > 3:
+                diff = (input_channels - 3) // 2
+
+                new_conv1.weight.data.fill_(0.)
+                new_conv1.weight[:, diff:diff + 3, :, :].data.copy_(conv1_weights)
+
+        if model_name in ['senet154', 'se_resnext50']:
+            model[0].conv1 = new_conv1
+        else:
+            model[0] = new_conv1
+
+    if weights_path is not None:
+        if model_name not in ['senet154', 'se_resnext50']:
+            raise NotImplementedError
         weights = load_base_weights(weights_path, input_channels)
         model.load_state_dict(weights)
 
-    return model
+    return model, num_features
 
 
 def load_base_weights(weights_path, input_channels):

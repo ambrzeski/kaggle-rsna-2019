@@ -132,7 +132,7 @@ class IntracranialDataset(Dataset):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    from rsna19.configs.se_resnext50_2dc import Config as config
+    from rsna19.configs.clf2Dc import Config as config
 
     dataset = IntracranialDataset(config, [0], augment=True)
     show_all_slices = False
