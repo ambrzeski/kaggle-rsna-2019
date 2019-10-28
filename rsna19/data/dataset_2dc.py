@@ -34,8 +34,14 @@ class IntracranialDataset(Dataset):
 
         dataset_file = 'test.csv' if test else self.config.dataset_file
         data = pd.read_csv(os.path.join(csv_root_dir, dataset_file))
+
         if not test:
             data = data[data.fold.isin(folds)]
+
+        if config.use_cq500:
+            data_cq500 = pd.read_csv(os.path.join(csv_root_dir, 'cq500_5fold.csv'))
+            data = pd.concat([data, data_cq500], axis=0)
+
         data = data.reset_index()
         self.data = data
 

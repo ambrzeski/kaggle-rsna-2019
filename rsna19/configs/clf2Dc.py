@@ -83,3 +83,5 @@ class Config(BaseConfig):
 
     contextual_attention = False
     spatial_attention = False
+
+    use_cq500 = True
