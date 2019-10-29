@@ -49,12 +49,6 @@ class IntracranialDataset(Dataset):
         if csv_root_dir is None:
             csv_root_dir = os.path.normpath(__file__ + '/../csv')
 
-        if is_test:
-            centers_csv_file = os.path.join(csv_root_dir, 'test_centers.csv')
-        else:
-            centers_csv_file = os.path.join(csv_root_dir, 'train_centers.csv')
-
-        self.centers_data = pd.read_csv(centers_csv_file).set_index('study_id', drop=True)
         self.hu_converter = hu_converter.HuConverter
 
         data = pd.read_csv(os.path.join(csv_root_dir, csv_file))
@@ -84,10 +78,8 @@ class IntracranialDataset(Dataset):
                 img = cv2.resize(img, (self.img_size, self.img_size), cv2.INTER_AREA)
 
             if self.center_crop > 0:
-                center_row, center_col = self.centers_data.loc[study_id, ['center_row', 'center_col']]
-                from_row = int(np.clip(center_row - self.center_crop // 2, 0, self.img_size - self.center_crop))
-                from_col = int(np.clip(center_col - self.center_crop // 2, 0, self.img_size - self.center_crop))
-
+                from_row = (self.img_size - self.center_crop) // 2
+                from_col = (self.img_size - self.center_crop) // 2
                 img = img[from_row:from_row + self.center_crop, from_col:from_col + self.center_crop]
 
             if self.convert_cdf:
@@ -108,14 +100,14 @@ class IntracranialDataset(Dataset):
 
         if self.preprocess_func:
             if self.num_slices == 5:
+                img_size = self.center_crop if self.center_crop > 0 else self.img_size
                 img = np.concatenate([img,
-                                      np.full((self.img_size, self.img_size, 1), self._HU_AIR, dtype=np.float)], axis=2)
+                                      np.full((img_size, img_size, 1), self._HU_AIR, dtype=np.float)], axis=2)
                 processed = self.preprocess_func(image=img)
                 img = processed['image'][:-1, :, :]
             else:
                 processed = self.preprocess_func(image=img)
                 img = processed['image']
-
 
         if self.apply_windows is not None:
             if isinstance(img, torch.Tensor):
@@ -165,7 +157,7 @@ if __name__ == '__main__':
         return l - w / 2, l + w / 2
 
     ds = IntracranialDataset(csv_file='5fold.csv', folds=[1],
-                             img_size=512,
+                             img_size=400,
                              # center_crop=384,
                              convert_cdf=True,
                              num_slices=5,
