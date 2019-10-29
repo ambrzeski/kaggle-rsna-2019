@@ -53,7 +53,7 @@ def predict(checkpoint_path, device, subset):
         all_gt = []
         all_pred = []
 
-        batch_size = 256
+        batch_size = 128
         data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=4)
         for bix, batch in tqdm(enumerate(data_loader), total=len(dataset) // batch_size):
             y_hat = F.sigmoid(model(batch['image'].cuda()))
@@ -86,10 +86,11 @@ def predict(checkpoint_path, device, subset):
 
 if __name__ == '__main__':
     checkpoint_paths = [
-        '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_3/models/_ckpt_epoch_2.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_4/models/_ckpt_epoch_2.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0007_window1/0_1_2_3/models/_ckpt_epoch_2.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0008_window2/0_1_2_3/models/_ckpt_epoch_2.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0014_384/0123/models/_ckpt_epoch_2.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0014_384/0124/models/_ckpt_epoch_2.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0014_384/0134/models/_ckpt_epoch_4.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0014_384/0234/models/_ckpt_epoch_4.ckpt',
+        '/kolos/m2/ct/models/classification/rsna/0014_384/1234/models/_ckpt_epoch_4.ckpt'
     ]
 
-    predict(checkpoint_paths[3], 3, 'test')
+    predict(checkpoint_paths[4], 0, 'test')

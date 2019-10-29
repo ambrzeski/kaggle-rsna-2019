@@ -1,4 +1,6 @@
 """ Load dicom files using vtk package """
+import json
+
 import shutil
 
 import os
@@ -17,6 +19,7 @@ from vtk.util.numpy_support import vtk_to_numpy
 import tqdm
 
 from rsna19.configs.base_config import BaseConfig
+from rsna19.data.utils import crop_scan
 from rsna19.preprocessing.pydicom_loader import PydicomLoader
 
 ShearParams = namedtuple('ShearParams', 'rad_tilt, minus_center_z')
@@ -43,11 +46,11 @@ class VtkImage:
         self.reader.Update()
 
         # prepare parameters for shear transform (gantry tilt)
-        x1, y1, z1, x2, y2, z2 = image_orientation = self.reader.GetImageOrientationPatient()
+        x1, y1, z1, x2, y2, z2 = self.image_orientation = self.reader.GetImageOrientationPatient()
 
         # if non-standard orientation, then it's non-standard series
         if y2 == 0:
-            raise Exception(f"Wrong patient orientation: {image_orientation}")
+            raise Exception(f"Wrong patient orientation: {self.image_orientation}")
 
         rad_tilt = atan(z2 / y2)
         center_z = self.reader.GetOutput().GetBounds()[5] / 2
@@ -156,52 +159,45 @@ class VtkImage:
         return array, spacing, self.shear_params
 
 
-def crop_scan(scan, dest_shape):
-    dest_shape = np.array(dest_shape)
-    _, y, x = ndimage.measurements.center_of_mass(scan > 0)
-    center = np.array([y, x], dtype=np.int32)
-    corner0 = center - dest_shape // 2
-    corner1 = corner0 + dest_shape
-
-    corner0_clipped = np.maximum(corner0, 0)
-    corner1_clipped = np.minimum(corner1, scan.shape[1:])
-    margin0 = np.abs(corner0 - corner0_clipped)
-    margin1 = np.abs(corner1 - corner1_clipped)
-
-    scan_cropped = np.zeros((scan.shape[0], dest_shape[0], dest_shape[1]), dtype=np.int16) + BG_HU
-    crop = scan[:, corner0_clipped[0]:corner1_clipped[0], corner0_clipped[1]:corner1_clipped[1]]
-    scan_cropped[:, margin0[0]:dest_shape[0] - margin1[0], margin0[1]:dest_shape[1] - margin1[1]] = crop
-
-    return scan_cropped
-
-
 def process_scan(scan_dir):
     out_dir = scan_dir.replace('dicom/', '3d/')
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir, exist_ok=True)
 
     try:
-        out_npy = VtkImage(scan_dir, spacing='none').get_slices()[0]
-        out_npy = crop_scan(out_npy, OUT_SIZE)
-
-        for idx, scan_slice in enumerate(out_npy):
-            np.save(f'{out_dir}{idx:03d}.npy', scan_slice.astype(np.int16))
+        vtk_image = VtkImage(scan_dir, spacing='none')
+        scan, spacing, _ = vtk_image.get_slices()
+        image_orientation = vtk_image.image_orientation
 
     except Exception:
+        traceback.print_exc()
+        print(scan_dir)
 
         exam_root = Path(scan_dir)
         slices = []
-        for slice_path in exam_root.iterdir():
+        for slice_path in sorted(exam_root.iterdir()):
             slices.append(loader.load(str(slice_path), convert_hu=False))
-
         scan = np.stack(slices)
-        scan_cropped = crop_scan(scan, OUT_SIZE)
+        spacing = None
+        image_orientation = None
 
-        for idx, scan_slice in enumerate(scan_cropped):
-            np.save(f'{out_dir}{idx:03d}.npy', scan_slice.astype(np.int16))
+    _, y, x = ndimage.measurements.center_of_mass(scan > 0)
+    pre_crop_shape = scan.shape
+    scan_cropped = crop_scan(scan, OUT_SIZE, x, y, BG_HU)
 
-        traceback.print_exc()
-        print(scan_dir)
+    meta = {
+        'spacing': spacing,
+        'image_orientation': image_orientation,
+        'crop_x': x,
+        'crop_y': y,
+        'pre_crop_shape': pre_crop_shape,
+        'out_shape': scan_cropped.shape
+    }
+    with open(out_dir + '../meta.json', 'w') as f:
+        json.dump(meta, f, indent=2)
+
+    for idx, scan_slice in enumerate(scan_cropped):
+        np.save(f'{out_dir}{idx:03d}.npy', scan_slice.astype(np.int16))
 
 
 def main():

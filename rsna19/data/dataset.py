@@ -1,5 +1,6 @@
 import math
 import os
+from glob import glob
 
 import numpy as np
 import pandas as pd
@@ -26,7 +27,9 @@ class IntracranialDataset(Dataset):
                  scale_values=1.0,
                  num_slices=1,
                  convert_cdf=False,
-                 apply_windows=None
+                 apply_windows=None,
+                 add_segmentation_masks=False,
+                 segmentation_oversample=20
                  ):
         """
         :param csv_file: path to csv file
@@ -52,10 +55,26 @@ class IntracranialDataset(Dataset):
         self.hu_converter = hu_converter.HuConverter
 
         data = pd.read_csv(os.path.join(csv_root_dir, csv_file))
+        study_ids = [path.split('/')[2] for path in data.path]
+        data['study_id'] = study_ids
+
+        if add_segmentation_masks:
+            seg_ids = {path.split('/')[-2] for path in glob(f'{BaseConfig.data_root}/segmentation_masks/*/Untitled.nii.gz')}
+        else:
+            seg_ids = set()
+        print(len(seg_ids))
+
+        self.segmentation_data = data[data.study_id.isin(folds)].copy()
+        self.segmentation_data = self.segmentation_data.reset_index()
+
         if not is_test:
+            data = data[~data.study_id.isin(folds)]
             data = data[data.fold.isin(folds)]
+
         data = data.reset_index()
         self.data = data
+
+        print(len(seg_ids))
 
     def __len__(self):
         return len(self.data)
@@ -147,6 +166,23 @@ class IntracranialDataset(Dataset):
         return res
 
 
+
+
+def print_stats(title, array):
+    if len(array):
+        print('{} shape:{} dtype:{} min:{} max:{} mean:{} median:{}'.format(
+            title,
+            array.shape,
+            array.dtype,
+            np.min(array),
+            np.max(array),
+            np.mean(array),
+            np.median(array)
+        ))
+    else:
+        print(title, 'empty')
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import albumentations
@@ -159,6 +195,7 @@ if __name__ == '__main__':
     ds = IntracranialDataset(csv_file='5fold.csv', folds=[1],
                              img_size=400,
                              # center_crop=384,
+                             add_segmentation_masks=True,
                              convert_cdf=True,
                              num_slices=5,
                              preprocess_func=albumentations.Compose([
@@ -172,6 +209,8 @@ if __name__ == '__main__':
                              )
     sample = ds[0]
     img = sample['image']  # .detach().numpy()
+    print_stats('images', img.detach().numpy())
+
     print(sample['labels'], img.shape, img.min(), img.max())
     for i in range(img.shape[0]):
         plt.imshow(img[i], cmap='gray')

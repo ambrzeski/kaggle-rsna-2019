@@ -31,7 +31,7 @@ def generate_submission(prediction_paths, out_path, clip_eps=0.0):
     submission_df = pd.concat(class_dfs).sort_values(by='ID')
     if clip_eps > 0:
         submission_df.Label = np.clip(submission_df.Label, clip_eps, 1 - clip_eps)
-    submission_df.to_csv(out_path, index=False, float_format='%.6f')
+    submission_df.to_csv(out_path, index=False, float_format='%.8f')
 
 
 if __name__ == '__main__':
@@ -73,4 +73,3 @@ if __name__ == '__main__':
     ]
     out_path = '/kolos/m2/ct/data/rsna/submissions/submission9.csv'
     generate_submission(prediction_paths, out_path, 1e-6)
-
