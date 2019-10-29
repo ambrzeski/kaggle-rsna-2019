@@ -159,6 +159,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
 
     if resume_epoch > -1:
         checkpoint = torch.load(f'{checkpoints_dir}/{resume_epoch:03}.pt')
+        print('load', f'{checkpoints_dir}/{resume_epoch:03}.pt')
         model.module.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
@@ -231,13 +232,13 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 labels = data['labels'].float().cuda()
 
                 with torch.set_grad_enabled(phase == 'train'):
-                    if epoch_num == model_info.single_slice_steps and phase == 'train':
-                        with torch.set_grad_enabled(False):
-                            model_x = model(img, output_before_combine_slices=True)
-                        with torch.set_grad_enabled(True):
-                            pred = model(model_x.detach(), train_last_layers_only=True)
-                    else:
-                        pred = model(img)
+                    # if epoch_num == model_info.single_slice_steps and phase == 'train':
+                    #     with torch.set_grad_enabled(False):
+                    #         model_x = model(img, output_before_combine_slices=True)
+                    #     with torch.set_grad_enabled(True):
+                    #         pred = model(model_x.detach(), train_last_layers_only=True)
+                    # else:
+                    pred = model(img)
                     loss = criterium(pred, labels)
 
                     if phase == 'train':
