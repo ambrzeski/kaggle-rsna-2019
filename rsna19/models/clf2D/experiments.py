@@ -511,6 +511,20 @@ MODELS = {
         single_slice_steps=6
     ),
 
+    'resnet34_400_5_planes_combine_last_var_no_acc': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=1,
+        single_slice_steps=6
+    ),
+
     'resnet34_400_5_planes_combine_last_var7': ModelInfo(
         factory=model_2dc.classification_model_resnet34_combine_last_var,
         args=dict(nb_input_slices=5),
@@ -537,5 +551,78 @@ MODELS = {
         initial_lr=1e-4,
         accumulation_steps=2,
         single_slice_steps=6,
+    ),
+
+    'resnext50_384_5_planes_combine_last_var': ModelInfo(
+        factory=model_2dc.classification_model_resnext50_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=4,
+        optimiser='radam',
+        initial_lr=2e-5,
+        accumulation_steps=1,
+        single_slice_steps=6
+    ),
+
+    'resnet34_400_5_planes_combine_last_var_dr0.2': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5, dropout=0.2),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'resnet34_400_5_planes_combine_last_var_dr0': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'resnet34_384_5_planes_combine_last_var': ModelInfo(
+        factory=model_2dc.classification_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'dpn68_384_5_planes_combine_last_var': ModelInfo(
+        factory=model_2dc.classification_model_dpn68_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=5,
+            convert_cdf=True),
+        batch_size=4,
+        optimiser='radam',
+        initial_lr=2e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
     ),
 }
