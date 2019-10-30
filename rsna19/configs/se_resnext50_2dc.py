@@ -2,7 +2,7 @@ from rsna19.configs.base_config import BaseConfig
 
 
 class Config(BaseConfig):
-    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0025_5_branch_pretrained2'
+    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0033_2Dc_5slices/baseline'
 
     dataset_file = '5fold.csv'
     data_version = '3d'  # '3d', 'npy', 'npy256' etc.
@@ -16,7 +16,7 @@ class Config(BaseConfig):
     pretrained = '/kolos/m2/ct/models/classification/rsna/0014_384/0123/models/_ckpt_epoch_2.ckpt'
 
     lr = 1e-4
-    batch_size = 5  # 16 (3, 512, 512) images fits on TITAN XP
+    batch_size = 24  # 16 (3, 512, 512) images fits on TITAN XP
     dropout = 0.5
     weight_decay = 0.001
     optimizer = 'radam'
@@ -28,9 +28,9 @@ class Config(BaseConfig):
         'min_lr': 1e-7
     }
 
-    freeze_backbone_iterations = 8000
+    freeze_backbone_iterations = 0
 
-    gpus = [2]
+    gpus = [0]
     num_workers = 3 * len(gpus)
 
     max_epoch = 20
@@ -53,5 +53,5 @@ class Config(BaseConfig):
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', no_bleeding
     probas = [0.1, 0.14, 0.14, 0.14, 0.14, 0.34]
 
-    multibranch = True
+    multibranch = False
     multibranch_embedding = 256
