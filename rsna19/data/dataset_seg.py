@@ -124,8 +124,9 @@ class IntracranialDataset(Dataset):
         img = (img * 2) - 1
         img = torch.tensor(img.transpose((2, 0, 1)), dtype=torch.float32)
 
-        out_seg = np.zeros((self.config.n_classes, seg.shape[0], seg.shape[1]), dtype=np.float32)
-        for class_ in range(1, self.config.n_classes):
+        # Add 1 to n_classes to compensate for the new 'non-classified' class
+        out_seg = np.zeros((self.config.n_classes + 1, seg.shape[0], seg.shape[1]), dtype=np.float32)
+        for class_ in range(1, self.config.n_classes + 1):
             out_seg[class_ - 1] = np.float32(seg == class_)
         # last class is any
         out_seg[-1] = np.float32(np.any(out_seg[:-1], axis=0))
