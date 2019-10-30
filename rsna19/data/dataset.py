@@ -7,9 +7,14 @@ import pandas as pd
 from pathlib import Path
 import cv2
 import torch
+import skimage
 from torch.utils.data import Dataset
+from tqdm import tqdm
+
 from preprocessing import hu_converter
 from rsna19.configs.base_config import BaseConfig
+
+from rsna19.data.utils import load_seg_slice, timeit_context, load_seg_3d
 
 
 class IntracranialDataset(Dataset):
@@ -39,6 +44,7 @@ class IntracranialDataset(Dataset):
         :param preprocess_func: preprocessing function, e.g. for window adjustment
         """
 
+        self.segmentation_oversample = segmentation_oversample
         self.num_slices = num_slices
         self.convert_cdf = convert_cdf
         self.center_crop = center_crop
@@ -58,29 +64,62 @@ class IntracranialDataset(Dataset):
         study_ids = [path.split('/')[2] for path in data.path]
         data['study_id'] = study_ids
 
+        if not is_test:
+            data = data[data.fold.isin(folds)]
+
         if add_segmentation_masks:
             seg_ids = {path.split('/')[-2] for path in glob(f'{BaseConfig.data_root}/segmentation_masks/*/Untitled.nii.gz')}
         else:
             seg_ids = set()
-        print(len(seg_ids))
 
-        self.segmentation_data = data[data.study_id.isin(folds)].copy()
-        self.segmentation_data = self.segmentation_data.reset_index()
+        self.seg_ids = seg_ids.intersection(data['study_id'].unique())
+        seg_data = data[data.study_id.isin(self.seg_ids)].copy()
+        data = data[~data.study_id.isin(self.seg_ids)]
 
-        if not is_test:
-            data = data[~data.study_id.isin(folds)]
-            data = data[data.fold.isin(folds)]
-
+        seg_data = seg_data.reset_index()
         data = data.reset_index()
+
         self.data = data
+        self.seg_data = seg_data
+
+        if add_segmentation_masks:
+            self.segmentation_masks = self.load_segmentation_masks()
+        else:
+            self.segmentation_masks = {}
 
         print(len(seg_ids))
+
+    def load_segmentation_masks(self):
+        res = {}
+        for study_id in tqdm(self.seg_ids):
+            meta_path = f'{BaseConfig.data_root}/segmentation_masks/{study_id}/meta.json'
+            seg_path = f'{BaseConfig.data_root}/segmentation_masks/{study_id}/Untitled.nii.gz'
+            seg = load_seg_3d(seg_path, meta_path)
+            if seg.shape[1:] != (self.img_size, self.img_size):
+                seg = np.array([
+                    skimage.transform.resize(np.float32(seg[i]), (self.img_size, self.img_size),
+                                             order=0, anti_aliasing=False).astype(seg.dtype)
+                    for i in range(seg.shape[0])
+                ])
+            res[study_id] = seg
+
+        return res
 
     def __len__(self):
-        return len(self.data)
+        return len(self.seg_data) * self.segmentation_oversample + len(self.data)
 
     def __getitem__(self, idx):
-        data_path = self.data.loc[idx, 'path'].replace('/npy/', '/3d/')
+        if idx < len(self.seg_data) * self.segmentation_oversample:
+            dataset = self.seg_data
+            dataset_idx = idx % len(self.seg_data)
+            have_segmentation = True
+        else:
+            dataset = self.data
+            dataset_idx = idx - len(self.seg_data) * self.segmentation_oversample
+            have_segmentation = False
+
+        data_path = dataset.loc[dataset_idx, 'path'].replace('/npy/', '/3d/')
+
         study_id = data_path.split('/')[-3]
         slice_num = int(os.path.basename(data_path).split('.')[0])
         full_path = os.path.normpath(os.path.join(BaseConfig.data_root, '..', data_path))
@@ -117,16 +156,48 @@ class IntracranialDataset(Dataset):
                 axis=2
             )
 
+        seg = None
+        if have_segmentation:
+            # meta_path = f'{BaseConfig.data_root}/segmentation_masks/{study_id}/meta.json'
+            # seg_path = f'{BaseConfig.data_root}/segmentation_masks/{study_id}/Untitled.nii.gz'
+            # with timeit_context('Load segmentation'):
+            # seg = load_seg_slice(seg_path, meta_path, slice_num, self.img_size)
+            seg = self.segmentation_masks[study_id][slice_num]
+
         if self.preprocess_func:
             if self.num_slices == 5:
                 img_size = self.center_crop if self.center_crop > 0 else self.img_size
                 img = np.concatenate([img,
                                       np.full((img_size, img_size, 1), self._HU_AIR, dtype=np.float)], axis=2)
-                processed = self.preprocess_func(image=img)
-                img = processed['image'][:-1, :, :]
+                if have_segmentation:
+                    processed = self.preprocess_func(image=img, mask=seg)
+                    seg = processed['mask']
+                else:
+                    processed = self.preprocess_func(image=img)
+                img = processed['image'][:, :, :-1]
             else:
-                processed = self.preprocess_func(image=img)
+                if have_segmentation:
+                    processed = self.preprocess_func(image=img, mask=seg)
+                    seg = processed['mask']
+                else:
+                    processed = self.preprocess_func(image=img)
                 img = processed['image']
+
+        out_seg = np.zeros((BaseConfig.n_classes, img.shape[0], img.shape[1]), dtype=np.float32)
+
+        if have_segmentation:
+            if self.center_crop > 0:
+                from_row = (self.img_size - self.center_crop) // 2
+                from_col = (self.img_size - self.center_crop) // 2
+                seg = seg[from_row:from_row + self.center_crop, from_col:from_col + self.center_crop]
+
+            for class_ in range(1, BaseConfig.n_classes):
+                out_seg[class_ - 1] = np.float32(seg == class_)
+            # last class is any
+            out_seg[-1] = np.float32(np.any(out_seg[:-1], axis=0))
+
+        out_seg = torch.tensor(out_seg)
+        img = torch.from_numpy(img.transpose(2, 0, 1))
 
         if self.apply_windows is not None:
             if isinstance(img, torch.Tensor):
@@ -151,16 +222,22 @@ class IntracranialDataset(Dataset):
             'image': img,
             'path': data_path,
             'study_id': study_id,
-            'slice_num': slice_num
+            'slice_num': slice_num,
+            'seg': out_seg,
+            'have_segmentation': have_segmentation
         }
 
         if self.return_labels:
-            labels = torch.tensor(self.data.loc[idx, ['epidural',
-                                                      'intraparenchymal',
-                                                      'intraventricular',
-                                                      'subarachnoid',
-                                                      'subdural',
-                                                      'any']], dtype=torch.float)
+            labels = torch.tensor(dataset.loc[
+                                      dataset_idx,
+                                      [
+                                          'epidural',
+                                          'intraparenchymal',
+                                          'intraventricular',
+                                          'subarachnoid',
+                                          'subdural',
+                                          'any'
+                                      ]], dtype=torch.float)
             res['labels'] = labels
 
         return res
@@ -203,15 +280,20 @@ if __name__ == '__main__':
                                      shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
                                      interpolation=cv2.INTER_LINEAR,
                                      border_mode=cv2.BORDER_REPLICATE,
-                                     p=0.99),
-                                 albumentations.pytorch.ToTensorV2()
+                                     p=0.99)
                              ]),
                              )
-    sample = ds[0]
+    sample = ds[2]
     img = sample['image']  # .detach().numpy()
     print_stats('images', img.detach().numpy())
 
     print(sample['labels'], img.shape, img.min(), img.max())
     for i in range(img.shape[0]):
         plt.imshow(img[i], cmap='gray')
+        plt.show()
+
+    seg = sample['seg']
+
+    for i in range(seg.shape[0]):
+        plt.imshow(seg[i], cmap='gray')
         plt.show()

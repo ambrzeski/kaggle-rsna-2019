@@ -88,8 +88,8 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                                             interpolation=cv2.INTER_LINEAR,
                                             border_mode=cv2.BORDER_REPLICATE,
                                             p=0.80),
-            albumentations.Flip(),
-            albumentations.RandomRotate90(),
+            albumentations.HorizontalFlip(),
+            # albumentations.RandomRotate90(),
         ]),
         **model_info.dataset_args
     )
@@ -98,7 +98,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         csv_file='5fold.csv',
         folds=[fold],
         preprocess_func=None,
-        **model_info.dataset_args
+        **{**model_info.dataset_args, "segmentation_oversample": 1}
     )
 
     data_loaders = {
@@ -121,8 +121,8 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                                                 interpolation=cv2.INTER_LINEAR,
                                                 border_mode=cv2.BORDER_REPLICATE,
                                                 p=0.80),
-                albumentations.Flip(),
-                albumentations.RandomRotate90()
+                albumentations.HorizontalFlip(),
+                # albumentations.RandomRotate90()
             ]),
             **{**model_info.dataset_args, "num_slices": 1}
         )
@@ -131,7 +131,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
             csv_file='5fold.csv',
             folds=[fold],
             preprocess_func=None,
-            **{**model_info.dataset_args, "num_slices": 1}
+            **{**model_info.dataset_args, "num_slices": 1, "segmentation_oversample" : 1}
         )
 
         data_loaders['train_1_slice'] = DataLoader(
@@ -166,6 +166,11 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     def criterium(y_pred,y_true):
         return F.binary_cross_entropy_with_logits(y_pred, y_true, class_weights.repeat(y_pred.shape[0], 1))
 
+    def criterium_mask(y_pred, y_true, have_segmentation):
+        if not max(have_segmentation):
+            return 0
+        return F.binary_cross_entropy(y_pred[have_segmentation], y_true[have_segmentation]) * 10
+
     # criterium = nn.BCEWithLogitsLoss()
 
     # fit new layers first:
@@ -176,6 +181,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         pre_fit_steps = 50000 // model_info.batch_size
         data_iter = tqdm(enumerate(data_loader), total=pre_fit_steps)
         epoch_loss = []
+        epoch_loss_mask = []
         initial_optimizer = radam.RAdam(model.parameters(), lr=1e-4)
         for iter_num, data in data_iter:
             if iter_num > pre_fit_steps:
@@ -183,21 +189,31 @@ def train(model_name, fold, run=None, resume_epoch=-1):
             with torch.set_grad_enabled(True):
                 img = data['image'].float().cuda()
                 labels = data['labels'].cuda()
-                pred = model(img)
-                loss = criterium(pred, labels)
-                loss.backward()
+                segmentation_labels = data['seg'].cuda()
+                have_segmentation = data['have_segmentation']
+                have_any_segmentation = max(have_segmentation)
+
+                pred, segmentation = model(img)
+
+                loss_cls = criterium(pred, labels)
+                loss_mask = criterium_mask(segmentation, F.max_pool2d(segmentation_labels, 4), have_segmentation)
+                (loss_cls + loss_mask).backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
                 initial_optimizer.step()
                 initial_optimizer.zero_grad()
-                epoch_loss.append(float(loss))
+                epoch_loss.append(float(loss_cls))
+                if have_any_segmentation:
+                    epoch_loss_mask.append(float(loss_mask))
 
-                data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-500:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
+                data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-500:]):1.4f} Avg {np.mean(epoch_loss):1.4f}' +
+                                          f' Running mask {np.mean(epoch_loss_mask[-500:]):1.4f} Mask {np.mean(epoch_loss_mask):1.4f}')
     model.module.unfreeze_encoder()
 
     for epoch_num in range(resume_epoch+1, 12):
         for phase in ['train', 'val']:
             model.train(phase == 'train')
             epoch_loss = []
+            epoch_loss_mask = []
             epoch_labels = []
             epoch_predictions = []
             epoch_sample_paths = []
@@ -228,37 +244,40 @@ def train(model_name, fold, run=None, resume_epoch=-1):
             for iter_num, data in data_iter:
                 img = data['image'].float().cuda()
                 labels = data['labels'].float().cuda()
+                segmentation_labels = data['seg'].cuda()
+                have_segmentation = data['have_segmentation']
+                have_any_segmentation = max(have_segmentation)
 
                 with torch.set_grad_enabled(phase == 'train'):
-                    # if epoch_num == model_info.single_slice_steps and phase == 'train':
-                    #     with torch.set_grad_enabled(False):
-                    #         model_x = model(img, output_before_combine_slices=True)
-                    #     with torch.set_grad_enabled(True):
-                    #         pred = model(model_x.detach(), train_last_layers_only=True)
-                    # else:
-                    pred = model(img)
-                    loss = criterium(pred, labels)
+                    pred, segmentation = model(img)
+
+                    loss_cls = criterium(pred, labels)
+                    loss_mask = criterium_mask(segmentation, F.max_pool2d(segmentation_labels, 4), have_segmentation)
 
                     if phase == 'train':
-                        (loss / model_info.accumulation_steps).backward()
+                        ((loss_cls + loss_mask) / model_info.accumulation_steps).backward()
                         if (iter_num + 1) % model_info.accumulation_steps == 0:
                             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                             optimizer.step()
                             optimizer.zero_grad()
 
-                    epoch_loss.append(float(loss))
+                    epoch_loss.append(float(loss_cls))
+                    if have_any_segmentation:
+                        epoch_loss_mask.append(float(loss_mask))
 
                     epoch_labels.append(labels.detach().cpu().numpy())
                     epoch_predictions.append(torch.sigmoid(pred).detach().cpu().numpy())
                     epoch_sample_paths += data['path']
 
                 data_iter.set_description(
-                    f'{epoch_num} Loss: Running {np.mean(epoch_loss[-1000:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
+                    f'Loss: Running {np.mean(epoch_loss[-500:]):1.4f} Avg {np.mean(epoch_loss):1.4f}' +
+                    f' Running mask {np.mean(epoch_loss_mask[-500:]):1.4f} Mask {np.mean(epoch_loss_mask):1.4f}')
 
             epoch_labels = np.row_stack(epoch_labels)
             epoch_predictions = np.row_stack(epoch_predictions)
 
             logger.add_scalar(f'loss_{phase}', np.mean(epoch_loss), epoch_num)
+            logger.add_scalar(f'loss_mask_{phase}', np.mean(epoch_loss_mask), epoch_num)
             logger.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch_num)  # scheduler.get_lr()[0]
             try:
                 log_metrics(logger=logger, phase=phase, epoch_num=epoch_num, y=epoch_labels, y_hat=epoch_predictions)

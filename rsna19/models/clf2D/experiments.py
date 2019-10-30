@@ -1,4 +1,4 @@
-from rsna19.models.clf2D import model_2d, model_2dc
+from rsna19.models.clf2D import model_2d, model_2dc, model_2dc_segmentation
 from models.clf3D import model_3d
 
 
@@ -611,17 +611,53 @@ MODELS = {
         single_slice_steps=6
     ),
 
-    'dpn68_384_5_planes_combine_last_var': ModelInfo(
+    'dpn68_400_5_planes_combine_last_var': ModelInfo(
         factory=model_2dc.classification_model_dpn68_combine_last_var,
         args=dict(nb_input_slices=5),
         dataset_args=dict(
             img_size=400,
-            center_crop=384,
+            # center_crop=384,
             num_slices=5,
             convert_cdf=True),
         batch_size=4,
         optimiser='radam',
         initial_lr=2e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'resnet34_384_5_planes_segmentation': ModelInfo(
+        factory=model_2dc_segmentation.segmentation_model_resnet34_combine_last_var,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=True,
+            segmentation_oversample=25
+        ),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'resnet34_384_5_planes_segmentation2': ModelInfo(
+        factory=model_2dc_segmentation.segmentation_model_resnet34_combine_last_var2,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=True,
+            segmentation_oversample=25
+        ),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
         accumulation_steps=2,
         single_slice_steps=6
     ),

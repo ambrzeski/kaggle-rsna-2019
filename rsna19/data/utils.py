@@ -11,6 +11,9 @@ import pandas as pd
 import skimage
 import transforms3d
 from scipy import ndimage
+import time
+from contextlib import contextmanager
+
 
 from rsna19.configs.base_config import BaseConfig
 
@@ -190,3 +193,11 @@ def draw_labels(img, labels):
             cv2.circle(img, (step, step // 2 + counter * step), step // 2, class_colors[c], -1)
             cv2.putText(img, c, (2 * step, step // 2 + counter * step), cv2.FONT_HERSHEY_SIMPLEX, .5, class_colors[c])
             counter += 1
+
+
+@contextmanager
+def timeit_context(name):
+    startTime = time.time()
+    yield
+    elapsedTime = time.time() - startTime
+    print('[{}] finished in {} ms'.format(name, int(elapsedTime * 1000)))

@@ -32,7 +32,7 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
         preprocess_func.append(albumentations.VerticalFlip(always_apply=True))
     # if 'rot90' in mode:
     #     preprocess_func.append(albumentations.RandomRotate90( always_apply=True))
-    preprocess_func.append(albumentations.pytorch.ToTensorV2())
+    # preprocess_func.append(albumentations.pytorch.ToTensorV2())
 
     dataset_valid = dataset.IntracranialDataset(
         csv_file='test.csv' if is_test else '5fold.csv',
