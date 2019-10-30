@@ -57,11 +57,11 @@ class IntracranialDataset(Dataset):
         if self.config.negative_data_steps is None:
             return 0
 
-        if self.global_step_counter < self.config.negative_data_steps[0]:
+        if self.global_step_counter/self.config.batch_size < self.config.negative_data_steps[0]:
             return 0
-        elif self.global_step_counter < self.config.negative_data_steps[1]:
+        elif self.global_step_counter/self.config.batch_size < self.config.negative_data_steps[1]:
             return 0.15
-        elif self.global_step_counter < self.config.negative_data_steps[2]:
+        elif self.global_step_counter/self.config.batch_size < self.config.negative_data_steps[2]:
             return 0.30
         else:
             return 0.40
@@ -71,6 +71,7 @@ class IntracranialDataset(Dataset):
 
     def __getitem__(self, idx):
         _HU_AIR = -1000
+        self.global_step_counter += 1
         proba = self.get_random_negative_prob()
         if random.random() < proba:
             dir_path = Path(self.negative_data.sample()['path'].values[0].replace('rsna/', ''))
