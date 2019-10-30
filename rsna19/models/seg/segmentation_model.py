@@ -93,7 +93,9 @@ class SegmentationModel(pl.LightningModule):
 
     @pl.data_loader
     def train_dataloader(self):
-        return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment),
+        use_negatives = True if self.config.negative_data_steps is not None else False
+        return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment,
+                                              use_negatives=use_negatives),
                           num_workers=self.config.num_workers,
                           batch_size=self.config.batch_size,
                           shuffle=True)

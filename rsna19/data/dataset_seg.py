@@ -18,7 +18,7 @@ from rsna19.preprocessing.hu_converter import HuConverter
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, test=False, augment=False):
+    def __init__(self, config, folds, test=False, augment=False, use_negatives=False):
         """
         :param folds: list of selected folds
         :param return_labels: if True, labels will be returned with image
@@ -26,6 +26,7 @@ class IntracranialDataset(Dataset):
         self.config = config
         self.test = test
         self.augment = augment
+        self.use_negatives = use_negatives
 
         if config.csv_root_dir is None:
             csv_root_dir = os.path.normpath(__file__ + '/../csv')
@@ -54,7 +55,7 @@ class IntracranialDataset(Dataset):
         self.global_step_counter = 0
 
     def get_random_negative_prob(self):
-        if self.config.negative_data_steps is None:
+        if self.config.negative_data_steps is None or not self.use_negatives:
             return 0
 
         if self.global_step_counter/self.config.batch_size < self.config.negative_data_steps[0]:
