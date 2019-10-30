@@ -30,8 +30,8 @@ class Config(BaseConfig):
 
     scheduler = {
         'name': 'flat_anneal',
-        'flat_iterations': 1500,
-        'anneal_iterations': 6000,
+        'flat_iterations': 2500,
+        'anneal_iterations': 8000,
         'min_lr': 1e-6
     }
 
@@ -40,15 +40,17 @@ class Config(BaseConfig):
 
     max_epoch = 60
 
+    negative_data_steps = [1500, 2500, 5000]
+
     num_slices = 3  # must be odd
     pre_crop_size = 400
-    train_image_size = None
+    train_image_size = 448
 
     crop_size = 384
     random_crop = False
     center_crop = False
 
-    shift_pixel_value = 15
+    shift_value = 0.04
     vertical_flip = False
     pixel_augment = False
     elastic_transform = False
