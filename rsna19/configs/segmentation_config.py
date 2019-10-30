@@ -41,10 +41,14 @@ class Config(BaseConfig):
     max_epoch = 60
 
     num_slices = 3  # must be odd
-    pre_crop_size = 384
+    pre_crop_size = 400
+    train_image_size = None
+
     crop_size = 384
     random_crop = False
     center_crop = False
+
+    shift_pixel_value = 15
     vertical_flip = False
     pixel_augment = False
     elastic_transform = False

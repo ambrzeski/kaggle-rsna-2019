@@ -1,5 +1,6 @@
 from glob import glob
 from pathlib import Path
+import random
 
 import albumentations
 import albumentations.pytorch
@@ -38,6 +39,10 @@ class IntracranialDataset(Dataset):
         seg_ids = [path.split('/')[-2] for path in glob(f'{self.config.data_root}/train/*/Untitled.nii.gz')]
         data = data[data.path.apply(lambda x: x.split('/')[2]).isin(seg_ids)]
 
+        negative_data = pd.read_csv(os.path.join(csv_root_dir, '5fold3D.csv'))
+        negative_data = negative_data[negative_data.fold.isin(folds)]
+        self.negative_data = negative_data[negative_data['any'] == 0]
+
         if not test:
             data = data[data.fold.isin(folds)]
         data = data.reset_index()
@@ -46,11 +51,36 @@ class IntracranialDataset(Dataset):
         if self.config.use_cdf:
             self.hu_converter = HuConverter
 
+        self.global_step_counter = 0
+        self.negative_data_steps = [2000, 4000, 6000]
+
+    def get_random_negative_prob(self):
+        if self.global_step_counter < self.negative_data_steps[0]:
+            return 0
+        elif self.global_step_counter < self.negative_data_steps[1]:
+            return 0.2
+        elif self.global_step_counter < self.negative_data_steps[2]:
+            return 0.33
+
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        path = self.data.loc[idx, 'path']
+        _HU_AIR = -1000
+        proba = self.get_random_negative_prob()
+        if random.random() < proba:
+            dir_path = Path(self.negative_data.sample()['path'].values[0].replace('rsna/', ''))
+            dir_path = self.config.data_root / dir_path / '3d'
+            num_slices = len(list(dir_path.iterdir()))
+            path = str(dir_path / '{:03d}'.format(random.randint(0, num_slices-1)))
+            if self.config.train_image_size:
+                seg = np.zeros((self.config.train_image_size, self.config.train_image_size))
+            else:
+                seg = np.zeros((self.config.pre_crop_size, self.config.pre_crop_size))
+        else:
+            path = self.data.loc[idx, 'path']
+            seg = None
+
         study_id = path.split('/')[2]
         slice_num = os.path.basename(path).split('.')[0]
         path = os.path.normpath(os.path.join(self.config.data_root, '..', path))
@@ -69,8 +99,21 @@ class IntracranialDataset(Dataset):
         slices_indices = list(range(middle_img_num - self.config.num_slices // 2,
                                     middle_img_num + self.config.num_slices // 2 + 1))
 
-        slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
-        seg = load_seg_slice(seg_path, meta_path, middle_img_num, self.config.pre_crop_size)
+        if self.config.train_image_size:
+            margin = int((self.config.train_image_size - self.config.pre_crop_size) / 2)
+            slices_image = np.full((self.config.num_slices, self.config.tragiin_image_size, self.config.train_image_size), _HU_AIR)
+            slices_image[:, margin:margin+self.config.pre_crop_size, margin:margin+self.config.pre_crop_size] = \
+                load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
+        else:
+            slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
+        if seg is None:
+            if self.config.train_image_size:
+                margin = int((self.config.train_image_size - self.config.pre_crop_size) / 2)
+                seg = np.zeros((self.config.train_image_size, self.config.train_image_size))
+                seg[margin:margin+self.config.pre_crop_size, margin:margin+self.config.pre_crop_size] = \
+                    load_seg_slice(seg_path, meta_path, middle_img_num, self.config.pre_crop_size)
+            else:
+                seg = load_seg_slice(seg_path, meta_path, middle_img_num, self.config.pre_crop_size)
 
         if self.config.use_cdf:
             slices_image = self.hu_converter.convert(slices_image)
@@ -103,7 +146,7 @@ class IntracranialDataset(Dataset):
             transforms.extend([
                 albumentations.HorizontalFlip(p=0.5),
                 albumentations.ShiftScaleRotate(
-                    shift_limit=0, scale_limit=0.15, rotate_limit=30,
+                    shift_limit=self.config.shift_pixel_value, scale_limit=0.15, rotate_limit=30,
                     interpolation=cv2.INTER_LINEAR,
                     border_mode=cv2.BORDER_CONSTANT,
                     value=0,
@@ -153,7 +196,7 @@ class IntracranialDataset(Dataset):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    from rsna19.configs.se_resnext50_2dc import Config as config
+    from rsna19.configs.segmentation_config import Config as config
 
     dataset = IntracranialDataset(config, [0, 1, 2, 3], augment=True)
 
