@@ -55,7 +55,7 @@ def normalize_train(image, min_hu_value=-1000, max_hu_value=1000):
     return image
 
 
-def load_scan_2dc(middle_img_path, slices_indices, slice_size):
+def load_scan_2dc(middle_img_path, slices_indices, slice_size, padded_size=None):
     slices_image = np.zeros((len(slices_indices), slice_size, slice_size))
     for slice_idx, img_num in enumerate(slices_indices):
 
@@ -69,6 +69,11 @@ def load_scan_2dc(middle_img_path, slices_indices, slice_size):
                                    interpolation=cv2.INTER_AREA)
 
         slices_image[slice_idx] = slice_img
+
+    if padded_size is not None:
+        margin = (padded_size - slice_size) // 2
+        slices_image = np.pad(slices_image, ((0, 0), (margin, margin), (margin, margin)), mode='constant',
+                              constant_values=HU_AIR)
 
     return slices_image
 

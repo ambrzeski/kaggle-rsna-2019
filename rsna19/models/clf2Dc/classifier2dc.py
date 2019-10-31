@@ -230,7 +230,7 @@ class Classifier2DC(pl.LightningModule):
                               batch_sampler=BalancedBatchSampler(self.config, self.train_folds))
         else:
             return DataLoader(IntracranialDataset(self.config, self.train_folds,
-                                                  augment=self.config.augment),
+                                                  augment=self.config.augment, use_cq500=self.config.use_cq500),
                               num_workers=self.config.num_workers,
                               batch_size=self.config.batch_size,
                               shuffle=True)

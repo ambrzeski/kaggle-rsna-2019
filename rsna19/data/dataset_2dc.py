@@ -67,7 +67,8 @@ class IntracranialDataset(Dataset):
         slices_indices = list(range(middle_img_num - self.config.num_slices // 2,
                                     middle_img_num + self.config.num_slices // 2 + 1))
 
-        slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
+        slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size,
+                                     self.config.padded_size)
 
         if self.config.use_cdf:
             slices_image = self.hu_converter.convert(slices_image)
@@ -106,7 +107,7 @@ class IntracranialDataset(Dataset):
             transforms.extend([
                 albumentations.HorizontalFlip(p=0.5),
                 albumentations.ShiftScaleRotate(
-                    shift_limit=0, scale_limit=0.15, rotate_limit=30,
+                    shift_limit=self.config.shift_limit, scale_limit=0.15, rotate_limit=30,
                     interpolation=cv2.INTER_LINEAR,
                     border_mode=cv2.BORDER_CONSTANT,
                     value=0,
