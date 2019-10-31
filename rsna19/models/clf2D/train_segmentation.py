@@ -87,11 +87,11 @@ def train(model_name, fold, run=None, resume_epoch=-1):
             albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.05, rotate_limit=30,
                                             interpolation=cv2.INTER_LINEAR,
                                             border_mode=cv2.BORDER_REPLICATE,
-                                            p=0.80),
+                                            p=0.7),
             albumentations.HorizontalFlip(),
             # albumentations.RandomRotate90(),
         ]),
-        **model_info.dataset_args
+        **{**model_info.dataset_args, "segmentation_oversample": 1}
     )
 
     dataset_valid = dataset.IntracranialDataset(
@@ -112,6 +112,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                             batch_size=model_info.batch_size)
     }
 
+    dataset_train_1_slice = None
     if model_info.single_slice_steps > 0:
         dataset_train_1_slice = dataset.IntracranialDataset(
             csv_file='5fold-rev3.csv',
@@ -120,7 +121,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 albumentations.ShiftScaleRotate(shift_limit=16. / 256, scale_limit=0.05, rotate_limit=30,
                                                 interpolation=cv2.INTER_LINEAR,
                                                 border_mode=cv2.BORDER_REPLICATE,
-                                                p=0.80),
+                                                p=0.75),
                 albumentations.HorizontalFlip(),
                 # albumentations.RandomRotate90()
             ]),
@@ -169,7 +170,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     def criterium_mask(y_pred, y_true, have_segmentation):
         if not max(have_segmentation):
             return 0
-        return F.binary_cross_entropy(y_pred[have_segmentation], y_true[have_segmentation]) * 10
+        return F.binary_cross_entropy(y_pred[have_segmentation], y_true[have_segmentation])
 
     # criterium = nn.BCEWithLogitsLoss()
 
@@ -210,6 +211,9 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     model.module.unfreeze_encoder()
 
     for epoch_num in range(resume_epoch+1, 12):
+        if epoch_num > 2 and dataset_train_1_slice is not None:
+            dataset_train_1_slice.segmentation_oversample = 1
+
         for phase in ['train', 'val']:
             model.train(phase == 'train')
             epoch_loss = []
