@@ -22,10 +22,10 @@ def main():
 
     checkpoint_callback = ModelCheckpoint(
         filepath=os.path.join(config.train_out_dir, "models"),
-        save_best_only=False,
+        save_best_only=True,
         verbose=True,
-        monitor='val_loss',
-        mode='min',
+        monitor='val_iou_any',
+        mode='max',
         prefix=''
     )
 

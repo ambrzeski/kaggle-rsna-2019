@@ -66,7 +66,10 @@ class SegmentationModel(pl.LightningModule):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         avg_iou = torch.stack([x['batch_iou'] for x in outputs]).mean()
         avg_fscore = torch.stack([x['batch_fscore'] for x in outputs]).mean()
-        return {'avg_val_loss': avg_loss, 'val_iou': avg_iou, 'avg_fscore': avg_fscore}
+        return {'avg_val_loss': avg_loss,
+                'val_iou': avg_iou,
+                'avg_fscore': avg_fscore,
+                'val_iou_any': outputs[-1]['batch_iou']}
 
     def on_batch_start(self, batch):
         if self.config.scheduler['name'] == 'flat_anneal':
