@@ -104,7 +104,9 @@ class ClassificationModelResnetCombineLastVariable(nn.Module):
         self.dec3 = DecoderBlock(128 + filters * 8, filters * 8, level=2)
         self.dec2 = DecoderBlock(64 + filters * 8, filters * 4, level=1)
 
-        self.fc_segmentation = nn.Conv2d(filters * 4, nb_features, kernel_size=1)
+        nb_segmentation_features = 7
+
+        self.fc_segmentation = nn.Conv2d(filters * 4, nb_segmentation_features, kernel_size=1)
 
     def freeze_encoder(self):
         self.base_model.eval()
@@ -190,7 +192,6 @@ class ClassificationModelResnetCombineLastVariable2(nn.Module):
     def __init__(self,
                  base_model,
                  DecoderBlock,
-                 base_model_features,
                  base_model_l1_outputs,
                  nb_features,
                  filters=16,
@@ -201,7 +202,6 @@ class ClassificationModelResnetCombineLastVariable2(nn.Module):
         self.base_model = base_model
         self.nb_features = nb_features
         self.nb_input_slices = nb_input_slices
-        self.base_model_features = base_model_features
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.l1 = nn.Conv2d(1, base_model_l1_outputs, kernel_size=7, stride=2, padding=3, bias=False)
@@ -220,14 +220,15 @@ class ClassificationModelResnetCombineLastVariable2(nn.Module):
 
         # self.fc1 = nn.Linear(512 * 2 + nb_features, 128)
         # self.fc2 = nn.Linear(128, nb_features)
+        nb_segmentation_features = 7
 
-        self.fc = nn.Linear(256 * 2 + nb_features, nb_features)
+        self.fc = nn.Linear(256 * 2 + nb_segmentation_features, nb_features)
 
         self.dec5 = DecoderBlock(256, filters * 16, level=4)
         self.dec4 = DecoderBlock(128 + filters * 16, filters * 8, level=3)
         self.dec3 = DecoderBlock(64 + filters * 8, filters * 4, level=2)
 
-        self.fc_segmentation = nn.Conv2d(filters * 4, nb_features, kernel_size=1)
+        self.fc_segmentation = nn.Conv2d(filters * 4, nb_segmentation_features, kernel_size=1)
 
     def freeze_encoder(self):
         self.base_model.eval()
@@ -319,7 +320,16 @@ def segmentation_model_resnet34_combine_last_var2(**kwargs):
     return ClassificationModelResnetCombineLastVariable2(
         base_model,
         DecoderBlock=DecoderBlock,
-        base_model_features=512,
+        nb_features=6,
+        base_model_l1_outputs=64,
+        **kwargs)
+
+
+def segmentation_model_resnet34_combine_last_var2_dec2(**kwargs):
+    base_model = pretrainedmodels.resnet34()
+    return ClassificationModelResnetCombineLastVariable2(
+        base_model,
+        DecoderBlock=DecoderBlock2,
         nb_features=6,
         base_model_l1_outputs=64,
         **kwargs)
@@ -332,7 +342,6 @@ if __name__ == '__main__':
     model = ClassificationModelResnetCombineLastVariable2(
         base_model,
         DecoderBlock=DecoderBlock2,
-        base_model_features=512,
         nb_features=6,
         base_model_l1_outputs=64)
 

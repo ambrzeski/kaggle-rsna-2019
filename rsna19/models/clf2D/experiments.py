@@ -653,7 +653,106 @@ MODELS = {
             num_slices=5,
             convert_cdf=True,
             add_segmentation_masks=True,
-            segmentation_oversample=25
+            segmentation_oversample=16
+        ),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'resnet34_384_5_planes_seg2_dec2': ModelInfo(
+        factory=model_2dc_segmentation.segmentation_model_resnet34_combine_last_var2_dec2,
+        args=dict(nb_input_slices=5),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=True,
+            segmentation_oversample=16
+        ),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+
+    'xception_400': ModelInfo(
+        factory=model_2dc.classification_model_xception,
+        args=dict(nb_input_slices=5, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=False
+        ),
+        batch_size=4,
+        optimiser='radam',
+        initial_lr=2e-5,
+        accumulation_steps=4,
+        single_slice_steps=6
+    ),
+
+    'nasnet_mobile_400': ModelInfo(
+        factory=model_2dc.classification_model_nasnet_mobile,
+        args=dict(nb_input_slices=5, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=False
+        ),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'bninception_400': ModelInfo(
+        factory=model_2dc.classification_model_bninception,
+        args=dict(nb_input_slices=5, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=False
+        ),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'resnet18_400': ModelInfo(
+        factory=model_2dc.classification_model_resnet18_combine_last_var,
+        args=dict(nb_input_slices=5, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=False
+        ),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1,
+        single_slice_steps=6
+    ),
+
+    'resnet50_400': ModelInfo(
+        factory=model_2dc.classification_model_resnet50_combine_last_var,
+        args=dict(nb_input_slices=5, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=False
         ),
         batch_size=8,
         optimiser='radam',

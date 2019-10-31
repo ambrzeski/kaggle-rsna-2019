@@ -183,7 +183,7 @@ class IntracranialDataset(Dataset):
                     processed = self.preprocess_func(image=img)
                 img = processed['image']
 
-        out_seg = np.zeros((BaseConfig.n_classes, img.shape[0], img.shape[1]), dtype=np.float32)
+        out_seg = np.zeros((BaseConfig.n_classes+1, img.shape[0], img.shape[1]), dtype=np.float32)
 
         if have_segmentation:
             if self.center_crop > 0:
@@ -191,7 +191,7 @@ class IntracranialDataset(Dataset):
                 from_col = (self.img_size - self.center_crop) // 2
                 seg = seg[from_row:from_row + self.center_crop, from_col:from_col + self.center_crop]
 
-            for class_ in range(1, BaseConfig.n_classes):
+            for class_ in range(1, BaseConfig.n_classes+1):
                 out_seg[class_ - 1] = np.float32(seg == class_)
             # last class is any
             out_seg[-1] = np.float32(np.any(out_seg[:-1], axis=0))

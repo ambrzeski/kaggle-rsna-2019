@@ -81,7 +81,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     model = model.cuda()
 
     dataset_train = dataset.IntracranialDataset(
-        csv_file='5fold.csv',
+        csv_file='5fold-rev2.csv',
         folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
         preprocess_func=albumentations.Compose([
             albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.05, rotate_limit=30,
@@ -95,7 +95,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     )
 
     dataset_valid = dataset.IntracranialDataset(
-        csv_file='5fold.csv',
+        csv_file='5fold-rev2.csv',
         folds=[fold],
         preprocess_func=None,
         **{**model_info.dataset_args, "segmentation_oversample": 1}
@@ -114,7 +114,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
 
     if model_info.single_slice_steps > 0:
         dataset_train_1_slice = dataset.IntracranialDataset(
-            csv_file='5fold.csv',
+            csv_file='5fold-rev2.csv',
             folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
             preprocess_func=albumentations.Compose([
                 albumentations.ShiftScaleRotate(shift_limit=16. / 256, scale_limit=0.05, rotate_limit=30,
@@ -128,7 +128,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         )
 
         dataset_valid_1_slice = dataset.IntracranialDataset(
-            csv_file='5fold.csv',
+            csv_file='5fold-rev2.csv',
             folds=[fold],
             preprocess_func=None,
             **{**model_info.dataset_args, "num_slices": 1, "segmentation_oversample" : 1}
