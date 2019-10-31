@@ -18,7 +18,7 @@ from rsna19.preprocessing.hu_converter import HuConverter
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, test=False, augment=False):
+    def __init__(self, config, folds, test=False, augment=False, use_cq500=False):
         """
         :param folds: list of selected folds
         :param return_labels: if True, labels will be returned with image
@@ -38,8 +38,9 @@ class IntracranialDataset(Dataset):
         if not test:
             data = data[data.fold.isin(folds)]
 
-        if config.use_cq500:
-            data_cq500 = pd.read_csv(os.path.join(csv_root_dir, 'cq500_5fold.csv'))
+        # protect from adding cq500 to validation
+        if use_cq500:
+            data_cq500 = pd.read_csv(os.path.join(csv_root_dir, 'cq500_5fold_cleared.csv'))
             data = pd.concat([data, data_cq500], axis=0)
 
         data = data.reset_index()

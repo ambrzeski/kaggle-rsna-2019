@@ -66,7 +66,10 @@ class SegmentationModel(pl.LightningModule):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         avg_iou = torch.stack([x['batch_iou'] for x in outputs]).mean()
         avg_fscore = torch.stack([x['batch_fscore'] for x in outputs]).mean()
-        return {'avg_val_loss': avg_loss, 'val_iou': avg_iou, 'avg_fscore': avg_fscore}
+        return {'avg_val_loss': avg_loss,
+                'val_iou': avg_iou,
+                'avg_fscore': avg_fscore,
+                'val_iou_any': outputs[-1]['batch_iou']}
 
     def on_batch_start(self, batch):
         if self.config.scheduler['name'] == 'flat_anneal':
@@ -93,7 +96,9 @@ class SegmentationModel(pl.LightningModule):
 
     @pl.data_loader
     def train_dataloader(self):
-        return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment),
+        use_negatives = True if self.config.negative_data_steps is not None else False
+        return DataLoader(IntracranialDataset(self.config, self.train_folds, augment=self.config.augment,
+                                              use_negatives=use_negatives),
                           num_workers=self.config.num_workers,
                           batch_size=self.config.batch_size,
                           shuffle=True)
