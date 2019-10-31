@@ -49,6 +49,7 @@ class Config(BaseConfig):
     max_epoch = 20
 
     num_slices = 5  # must be odd
+    append_masks = False
     pre_crop_size = 400
     crop_size = 384
     random_crop = True
