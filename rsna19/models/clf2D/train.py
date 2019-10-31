@@ -80,17 +80,26 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     model = torch.nn.DataParallel(model).cuda()
     model = model.cuda()
 
+    augmentations = [
+        albumentations.ShiftScaleRotate(shift_limit=16. / 256, scale_limit=0.05, rotate_limit=30,
+                                        interpolation=cv2.INTER_LINEAR,
+                                        border_mode=cv2.BORDER_REPLICATE,
+                                        p=0.80),
+    ]
+    if model_info.use_vflip:
+        augmentations += [
+            albumentations.Flip(),
+            albumentations.RandomRotate90()
+        ]
+    else:
+        augmentations += [
+            albumentations.HorizontalFlip()
+        ]
+
     dataset_train = dataset.IntracranialDataset(
         csv_file='5fold-rev3.csv',
         folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
-        preprocess_func=albumentations.Compose([
-            albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.05, rotate_limit=30,
-                                            interpolation=cv2.INTER_LINEAR,
-                                            border_mode=cv2.BORDER_REPLICATE,
-                                            p=0.80),
-            albumentations.Flip(),
-            albumentations.RandomRotate90(),
-        ]),
+        preprocess_func=albumentations.Compose(augmentations),
         **model_info.dataset_args
     )
 
@@ -113,17 +122,26 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     }
 
     if model_info.single_slice_steps > 0:
-        dataset_train_1_slice = dataset.IntracranialDataset(
-            csv_file='5fold-rev3.csv',
-            folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
-            preprocess_func=albumentations.Compose([
+        augmentations = [
                 albumentations.ShiftScaleRotate(shift_limit=16. / 256, scale_limit=0.05, rotate_limit=30,
                                                 interpolation=cv2.INTER_LINEAR,
                                                 border_mode=cv2.BORDER_REPLICATE,
                                                 p=0.80),
+            ]
+        if model_info.use_vflip:
+            augmentations += [
                 albumentations.Flip(),
                 albumentations.RandomRotate90()
-            ]),
+            ]
+        else:
+            augmentations += [
+                albumentations.HorizontalFlip()
+            ]
+
+        dataset_train_1_slice = dataset.IntracranialDataset(
+            csv_file='5fold-rev3.csv',
+            folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
+            preprocess_func=albumentations.Compose(augmentations),
             **{**model_info.dataset_args, "num_slices": 1}
         )
 
@@ -242,7 +260,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                     if phase == 'train':
                         (loss / model_info.accumulation_steps).backward()
                         if (iter_num + 1) % model_info.accumulation_steps == 0:
-                            torch.nn.utils.clip_grad_norm_(model.parameters(), 16.0)
+                            torch.nn.utils.clip_grad_norm_(model.parameters(), 32.0)
                             optimizer.step()
                             optimizer.zero_grad()
 

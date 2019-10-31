@@ -512,6 +512,31 @@ class BnInceptionModel(nn.Module):
         return self.base_model.features(x)
 
 
+class InceptionResnetV2(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.pad = torch.nn.ConstantPad2d(24, -1)
+        self.base_model = pretrainedmodels.inceptionresnetv2()
+        self.base_model.conv2d_1a.conv = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        self.base_model.conv2d_1a.conv.requires_grad = True
+        self.base_model.conv2d_1a.bn.requires_grad = True
+        self.base_model.conv2d_1a.bn.train()
+
+    def unfreeze_encoder(self):
+        self.base_model.train()
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs):
+        x = self.pad(inputs)
+        return self.base_model.features(x)
+
 
 def classification_model_resnet34_combine_last(**kwargs):
     base_model = pretrainedmodels.resnet34()
@@ -606,6 +631,15 @@ def classification_model_bninception(**kwargs):
     return BaseClassificationModel(
         base_model,
         base_model_features=1024,
+        nb_features=6,
+        **kwargs)
+
+
+def classification_model_inception_resnet_v2(**kwargs):
+    base_model = InceptionResnetV2()
+    return BaseClassificationModel(
+        base_model,
+        base_model_features=1536,
         nb_features=6,
         **kwargs)
 

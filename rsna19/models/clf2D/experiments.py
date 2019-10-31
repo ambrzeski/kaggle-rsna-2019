@@ -19,8 +19,10 @@ class ModelInfo:
                  use_3d=False,
                  clip_grad=1.0,
                  single_slice_steps=0,
-                 freeze_bn_step=-1
+                 freeze_bn_step=-1,
+                 use_vflip=True
                  ):
+        self.use_vflip = use_vflip
         self.freeze_bn_step = freeze_bn_step
         self.single_slice_steps = single_slice_steps
         self.clip_grad = clip_grad
@@ -745,6 +747,23 @@ MODELS = {
         single_slice_steps=6
     ),
 
+    'resnet18_400_no_vflip': ModelInfo(
+        factory=model_2dc.classification_model_resnet18_combine_last_var,
+        args=dict(nb_input_slices=5, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=False
+        ),
+        batch_size=16,
+        optimiser='radam',
+        initial_lr=1e-4,
+        accumulation_steps=1,
+        single_slice_steps=6,
+        use_vflip=False
+    ),
+
     'resnet50_400': ModelInfo(
         factory=model_2dc.classification_model_resnet50_combine_last_var,
         args=dict(nb_input_slices=5, dropout=0),
@@ -755,6 +774,23 @@ MODELS = {
             add_segmentation_masks=False
         ),
         batch_size=8,
+        optimiser='radam',
+        initial_lr=5e-5,
+        accumulation_steps=2,
+        single_slice_steps=6
+    ),
+
+    'inc_resnet_v2_384': ModelInfo(
+        factory=model_2dc.classification_model_inception_resnet_v2,
+        args=dict(nb_input_slices=3, dropout=0),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=3,
+            convert_cdf=True,
+            add_segmentation_masks=False
+        ),
+        batch_size=4,
         optimiser='radam',
         initial_lr=5e-5,
         accumulation_steps=2,
