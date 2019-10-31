@@ -138,12 +138,12 @@ def train(model_name, fold, run=None, resume_epoch=-1):
             dataset_train_1_slice,
             num_workers=8,
             shuffle=True,
-            batch_size=model_info.batch_size)
+            batch_size=model_info.batch_size*2)
         data_loaders['val_1_slice'] = DataLoader(
             dataset_valid_1_slice,
             shuffle=False,
             num_workers=8,
-            batch_size=model_info.batch_size)
+            batch_size=model_info.batch_size*2)
 
     model.train()
     optimizer = radam.RAdam(model.parameters(), lr=model_info.initial_lr)
@@ -186,7 +186,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 pred = model(img)
                 loss = criterium(pred, labels)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 100.0)
                 initial_optimizer.step()
                 initial_optimizer.zero_grad()
                 epoch_loss.append(float(loss))
@@ -242,7 +242,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                     if phase == 'train':
                         (loss / model_info.accumulation_steps).backward()
                         if (iter_num + 1) % model_info.accumulation_steps == 0:
-                            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                            torch.nn.utils.clip_grad_norm_(model.parameters(), 16.0)
                             optimizer.step()
                             optimizer.zero_grad()
 
