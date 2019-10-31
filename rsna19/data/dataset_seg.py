@@ -177,12 +177,12 @@ class IntracranialDataset(Dataset):
         for class_ in range(1, self.config.n_classes):
             out_seg[class_ - 1] = np.float32(seg == class_)
 
-        # # add non classified as any
+        # add non classified as any
         _NON_CLASSIFIED_CLASS_NUM = 6
         out_seg[-1] = np.float32(seg == _NON_CLASSIFIED_CLASS_NUM)
 
         # last class is any
-        out_seg[-1] = np.float32(np.any(out_seg[:-1], axis=0))
+        out_seg[-1] = np.float32(np.any(out_seg, axis=0))
         out_seg = torch.tensor(out_seg)
 
         out = {
