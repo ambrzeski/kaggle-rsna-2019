@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import cv2
 import json
@@ -20,6 +21,7 @@ from rsna19.configs.base_config import BaseConfig
 DICOM_TAGS_DF_PATH = '/kolos/m2/ct/data/rsna/df.pkl'
 HU_AIR = -1000
 SEG_CLASSES = ["epidural", "intraparenchymal", "intraventricular", "subarachnoid", "subdural", "non-classified", "any"]
+SEG_MASKS_HOME = "/kolos/ssd/ct-m2/"
 
 
 def load_dicom_tags():
@@ -69,6 +71,31 @@ def load_scan_2dc(middle_img_path, slices_indices, slice_size):
         slices_image[slice_idx] = slice_img
 
     return slices_image
+
+
+def load_seg_masks_2dc(middle_img_path, slices_indices, slice_size):
+    masks_image = np.zeros((len(slices_indices), slice_size, slice_size), dtype=np.float32)
+
+    for slice_idx, img_num in enumerate(slices_indices):
+
+        if img_num < 0 or img_num > (len(os.listdir(middle_img_path.parent)) - 1):
+            mask_img = np.zeros((slice_size, slice_size), dtype=np.uint8)
+        else:
+            exam_id = middle_img_path.parts[-3]
+            mask_path = Path(SEG_MASKS_HOME)/"data/rsna/train"/exam_id/"masks/cropped400/any/"/'{:03d}.png'.format(img_num)
+            mask_img = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+            if mask_img is None:
+                print("Error loading mask: ", mask_path)
+                mask_img = np.zeros((slice_size, slice_size), dtype=np.uint8)
+
+        if mask_img.shape != (slice_size, slice_size):
+            mask_img = cv2.resize(mask_img, (slice_size, slice_size), interpolation=cv2.INTER_CUBIC)
+
+        mask_img = np.float32(mask_img) / 255.0
+
+        masks_image[slice_idx] = mask_img
+
+    return masks_image
 
 
 def crop_scan(scan, dest_shape, x, y, pad_value):

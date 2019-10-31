@@ -11,7 +11,7 @@ import albumentations
 import albumentations.pytorch
 import cv2
 
-from rsna19.data.utils import normalize_train, load_scan_2dc
+from rsna19.data.utils import normalize_train, load_scan_2dc, load_seg_masks_2dc
 from rsna19.preprocessing.hu_converter import HuConverter
 
 
@@ -77,6 +77,12 @@ class IntracranialDataset(Dataset):
                                            self.config.max_hu_value)
 
         slices_image = (slices_image.transpose((1, 2, 0)) + 1) / 2
+
+        # Load and append segmentation masks
+        if self.config.append_masks:
+            seg_masks = load_seg_masks_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
+            seg_masks = seg_masks.transpose((1, 2, 0))
+            slices_image = np.concatenate((slices_image, seg_masks), axis=2)
 
         transforms = []
         if self.augment:
@@ -150,7 +156,7 @@ if __name__ == '__main__':
         print(sample['labels'], img.shape, img.min(), img.max())
         if show_all_slices:
             for slice_ in img:
-                plt.imshow(slice_, cmap='gray')
+                plt.imshow(slice_, cmap='gray', vmin=-1, vmax=1)
                 plt.show()
         else:
             plt.imshow(img[img.shape[0] // 2], cmap='gray')
