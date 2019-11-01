@@ -16,7 +16,7 @@ import rsna19.models.commons.metrics as metrics
 from rsna19.models.commons.radam import RAdam
 from rsna19.models.commons.concat_pool import concat_pool
 from rsna19.models.commons.get_base_model import get_base_model
-
+from rsna19.models.commons.mask_attention import MaskAttention, PoolAttentionConcat, MaskGWAP
 
 class Classifier2DC(pl.LightningModule):
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', 'any'
@@ -61,6 +61,13 @@ class Classifier2DC(pl.LightningModule):
         else:
             self.backbone_frozen = False
 
+        if self.config.mask_attention:
+            self.mask_attention1 = MaskAttention(64)
+            self.mask_attention2 = MaskAttention(128)
+            self.mask_attention3 = MaskAttention(256)
+            self.mask_attention4 = MaskAttention(512)
+            self.pool = PoolAttentionConcat()
+
     def freeze_backbone(self):
         self.backbone.eval()
         for param in self.backbone.parameters():
@@ -70,9 +77,11 @@ class Classifier2DC(pl.LightningModule):
             try:
                 conv1 = self.backbone[0].conv1
                 bn = self.backbone[0].bn1
-            except AttributeError:
-                conv1 = self.backbone[0]
-                bn = self.backbone[1]
+            except TypeError:
+                # conv1 = self.backbone[0]
+                # bn = self.backbone[1]
+                conv1 = self.backbone.layer0[0]
+                bn = self.backbone.layer0[1]
 
             for param in itertools.chain(conv1.parameters(), bn.parameters()):
                 param.requires_grad = True
@@ -81,6 +90,8 @@ class Classifier2DC(pl.LightningModule):
         self.backbone.train()
         for param in self.backbone.parameters():
             param.requires_grad = True
+
+    # def backbone_forward(self):
 
     def forward(self, x):
         if self.config.multibranch:
@@ -112,6 +123,26 @@ class Classifier2DC(pl.LightningModule):
                 x = x.view(batch_in_size, self.config.num_branches * self.num_features_backbone, x.shape[3], x.shape[4])
                 x = self.combine_conv(x)
                 x = concat_pool(x)
+        elif self.config.mask_attention:
+            x, masks = x[:, :self.config.num_slices, :, :], x[:, self.config.num_slices:, :, :]
+
+            x = self.backbone.conv1(x)
+            x = self.backbone.bn1(x)
+            x = self.backbone.relu(x)
+            x = self.backbone.maxpool(x)
+
+            # x = self.backbone.layer0(x)
+
+            x = self.backbone.layer1(x)
+            x = self.mask_attention1(x, masks)
+            x = self.backbone.layer2(x)
+            x = self.mask_attention2(x, masks)
+            x = self.backbone.layer3(x)
+            x = self.mask_attention3(x, masks)
+            x = self.backbone.layer4(x)
+            x = self.mask_attention4(x, masks)
+            # x = concat_pool(x)
+            x = self.pool(x, masks)
         else:
             x = self.backbone(x)
             x = concat_pool(x)

@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from math import pi, sqrt, exp
 
 import cv2
 import json
@@ -229,3 +230,8 @@ def timeit_context(name):
     yield
     elapsedTime = time.time() - startTime
     print('[{}] finished in {} ms'.format(name, int(elapsedTime * 1000)))
+
+
+def gauss(n=3, sigma=0.75):
+    r = range(-int(n/2),int(n/2)+1)
+    return [1 / (sigma * sqrt(2*pi)) * exp(-float(x)**2/(2*sigma**2)) for x in r]

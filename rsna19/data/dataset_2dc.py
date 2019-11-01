@@ -11,7 +11,7 @@ import albumentations
 import albumentations.pytorch
 import cv2
 
-from rsna19.data.utils import normalize_train, load_scan_2dc, load_seg_masks_2dc
+from rsna19.data.utils import normalize_train, load_scan_2dc, load_seg_masks_2dc, gauss
 from rsna19.preprocessing.hu_converter import HuConverter
 
 
@@ -82,7 +82,11 @@ class IntracranialDataset(Dataset):
         if self.config.append_masks:
             seg_masks = load_seg_masks_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
             seg_masks = seg_masks.transpose((1, 2, 0))
-            slices_image = np.concatenate((slices_image, seg_masks), axis=2)
+            if self.config.mask_attention:
+                seg_masks = np.average(seg_masks, weights=gauss(self.config.num_slices), axis=2)
+                seg_masks = cv2.GaussianBlur(seg_masks, (9, 9), 2)
+                seg_masks = seg_masks[:, :, np.newaxis]
+            slices_image = np.concatenate((slices_image, seg_masks), axis=2).astype(np.float32)
 
         transforms = []
         if self.augment:
@@ -121,7 +125,8 @@ class IntracranialDataset(Dataset):
         transforms.append(albumentations.pytorch.ToTensorV2())
 
         processed = albumentations.Compose(transforms)(image=slices_image)
-        img = (processed['image'] * 2) - 1
+        img = processed['image']
+        img[:self.config.num_slices, :, :] = (img[:self.config.num_slices, :, :] * 2) - 1
 
         # img = torch.tensor(slices_image, dtype=torch.float32)
 
