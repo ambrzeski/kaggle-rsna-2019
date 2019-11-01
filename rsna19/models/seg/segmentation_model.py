@@ -60,16 +60,18 @@ class SegmentationModel(pl.LightningModule):
 
         return {'val_loss': self.loss_func(y_hat, y),
                 'batch_iou': self.iou_metric(y_hat, y),
+                'batch_any_iou': self.iou_metric(y_hat[:, -1, :, :], y[:, -1, :, :]),
                 'batch_fscore': self.f_score_metric(y_hat, y)}
 
     def validation_end(self, outputs):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
         avg_iou = torch.stack([x['batch_iou'] for x in outputs]).mean()
+        val_iou_any = torch.stack([x['batch_any_iou'] for x in outputs]).mean()
         avg_fscore = torch.stack([x['batch_fscore'] for x in outputs]).mean()
         return {'avg_val_loss': avg_loss,
                 'val_iou': avg_iou,
                 'avg_fscore': avg_fscore,
-                'val_iou_any': outputs[-1]['batch_iou']}
+                'val_iou_any': val_iou_any}
 
     def on_batch_start(self, batch):
         if self.config.scheduler['name'] == 'flat_anneal':
