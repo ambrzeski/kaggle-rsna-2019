@@ -2,13 +2,14 @@ import json
 
 import albumentations
 import cv2
-from torch.nn import functional as F
+import numpy as np
 import os
+import pandas as pd
 import torch
+torch.multiprocessing.set_sharing_strategy('file_system')
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import numpy as np
-import pandas as pd
 
 from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.clf2Dc.classifier2dc import Classifier2DC
@@ -18,9 +19,9 @@ TTA_TRANSFORMS = {
     'hflip': [albumentations.HorizontalFlip(True)],
     'vflip': [albumentations.VerticalFlip(True)],
     'lrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
-                                     value=0, always_apply=True)],
+                                      value=0, always_apply=True)],
     'rrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
-                                     value=0, always_apply=True)]
+                                      value=0, always_apply=True)]
 }
 
 
