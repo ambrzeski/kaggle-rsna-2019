@@ -63,7 +63,7 @@ def predict(checkpoint_path, device, subset, tta_variant=None):
         else:
             folds = None
 
-        dataset = IntracranialDataset(config, folds, subset == 'test', augment=False,
+        dataset = IntracranialDataset(config, folds, mode=subset, augment=False,
                                       transforms=TTA_TRANSFORMS[tta_variant])
 
         all_paths = []
