@@ -18,13 +18,14 @@ from rsna19.preprocessing.hu_converter import HuConverter
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, test=False, augment=False, use_cq500=False, transforms=None):
+    def __init__(self, config, folds, mode='train', augment=False, use_cq500=False, transforms=None):
         """
         :param folds: list of selected folds
+        :param mode: 'train', 'val' or 'test'
         :param return_labels: if True, labels will be returned with image
         """
         self.config = config
-        self.test = test
+        self.mode = mode
         self.augment = augment
         self.additional_transforms = transforms
 
@@ -33,10 +34,17 @@ class IntracranialDataset(Dataset):
         else:
             csv_root_dir = config.csv_root_dir
 
-        dataset_file = 'test.csv' if test else self.config.dataset_file
+        dataset_file = None
+        if self.mode == 'train':
+            dataset_file = self.config.train_dataset_file
+        if self.mode == 'val':
+            dataset_file = self.config.val_dataset_file
+        if self.mode == 'test':
+            dataset_file = self.config.test_dataset_file
+
         data = pd.read_csv(os.path.join(csv_root_dir, dataset_file))
 
-        if not test:
+        if not mode == 'test':
             data = data[data.fold.isin(folds)]
 
         # protect from adding cq500 to validation
@@ -137,7 +145,7 @@ class IntracranialDataset(Dataset):
             'slice_num': slice_num
         }
 
-        if not self.test:
+        if not self.mode == 'test':
             out['labels'] = torch.tensor(self.data.loc[idx, ['epidural',
                                                              'intraparenchymal',
                                                              'intraventricular',

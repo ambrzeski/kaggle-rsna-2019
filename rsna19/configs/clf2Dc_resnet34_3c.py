@@ -4,7 +4,9 @@ from rsna19.configs.base_config import BaseConfig
 class Config(BaseConfig):
     train_out_dir = '/kolos/m2/ct/models/classification/rsna/0034_resnet34_3c/0123'
 
-    dataset_file = '5fold.csv'
+    train_dataset_file = '5fold.csv'
+    val_dataset_file = '5fold.csv'
+    test_dataset_file = 'test.csv'
     data_version = '3d'  # '3d', 'npy', 'npy256' etc.
     use_cq500 = False
     train_folds = [0, 1, 2, 3]
