@@ -16,6 +16,7 @@ class Config(BaseConfig):
     # 'imagenet', None or path to weights
     # pretrained = 'imagenet'
     pretrained = '/kolos/m2/ct/models/classification/rsna/0034_resnet34_3c/0123/models/_ckpt_epoch_3.ckpt'
+    conv1_weight_init_mode = 'center'  # 'center' or 'spread'
 
     lr = 1e-4
     batch_size = 24  # 16 (3, 512, 512) images fits on TITAN XP

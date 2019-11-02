@@ -54,14 +54,23 @@ def get_base_model(config):
                               stride=conv1.stride, padding=conv1.padding, bias=conv1.bias)
 
         if weights_path is None:
+
             if input_channels == 1:
-                new_conv1.weight.data.fill_(0.)
-                new_conv1.weight[:, 0, :, :].data.copy_(conv1_weights[:, 0, :, :])
-            elif input_channels > 3:
-                diff = (input_channels - 3) // 2
 
                 new_conv1.weight.data.fill_(0.)
-                new_conv1.weight[:, diff:diff + 3, :, :].data.copy_(conv1_weights)
+                new_conv1.weight[:, 0, :, :].data.copy_(conv1_weights[:, 0, :, :])
+
+            elif input_channels > 3:
+
+                if config.conv1_weight_init_mode == 'center':
+                    diff = (input_channels - 3) // 2
+                    new_conv1.weight.data.fill_(0.)
+                    new_conv1.weight[:, diff:diff + 3, :, :].data.copy_(conv1_weights)
+
+                if config.conv1_weight_init_mode == 'spread':
+                    weights_sum = conv1_weights.sum(dim=1, keepdim=True)
+                    weights = weights_sum / input_channels
+                    new_conv1.weight.data.copy_(weights)
 
         if model_name in ['senet154', 'se_resnext50']:
             model[0].conv1 = new_conv1
@@ -73,13 +82,13 @@ def get_base_model(config):
             conv1_str = '0.conv1.weight'
         else:
             conv1_str = '0.weight'
-        weights = load_base_weights(weights_path, input_channels, conv1_str)
+        weights = load_base_weights(weights_path, input_channels, conv1_str, config.conv1_weight_init_mode)
         model.load_state_dict(weights)
 
     return model, num_features
 
 
-def load_base_weights(weights_path, input_channels, conv1_str):
+def load_base_weights(weights_path, input_channels, conv1_str, conv1_weight_init_mode):
     weights = torch.load(weights_path, map_location='cpu')['state_dict']
     weights = {k.replace('backbone.', ''): v for k, v in weights.items() if not k.startswith('last')}
 
@@ -88,12 +97,17 @@ def load_base_weights(weights_path, input_channels, conv1_str):
     new_shape[1] = input_channels
     new_conv1_weights = torch.zeros(new_shape)
 
-    mid_c = conv1_weights.shape[1] // 2
-    new_mid_c = new_conv1_weights.shape[1] // 2
-    copied_channels = min(conv1_weights.shape[1], new_conv1_weights.shape[1])
+    if conv1_weight_init_mode == 'center':
+        mid_c = conv1_weights.shape[1] // 2
+        new_mid_c = new_conv1_weights.shape[1] // 2
+        copied_channels = min(conv1_weights.shape[1], new_conv1_weights.shape[1])
 
-    new_conv1_weights[:, new_mid_c - copied_channels // 2: new_mid_c + copied_channels // 2 + 1, :, :] = \
-        conv1_weights[:, mid_c - copied_channels // 2: mid_c + copied_channels // 2 + 1, :, :]
+        new_conv1_weights[:, new_mid_c - copied_channels // 2: new_mid_c + copied_channels // 2 + 1, :, :] = \
+            conv1_weights[:, mid_c - copied_channels // 2: mid_c + copied_channels // 2 + 1, :, :]
+
+    if conv1_weight_init_mode == 'spread':
+        weights_sum = conv1_weights.sum(dim=1, keepdim=True)
+        new_conv1_weights[:] = weights_sum / input_channels
 
     weights[conv1_str] = new_conv1_weights
 
