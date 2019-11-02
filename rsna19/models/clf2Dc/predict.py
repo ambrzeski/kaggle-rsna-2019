@@ -43,6 +43,14 @@ def predict(checkpoint_path, device, subset, tta_variant=None):
         config_dict = json.load(f)
         if 'dropout' not in config_dict:
             config_dict['dropout'] = 0
+        if 'padded_size' not in config_dict:
+            config_dict['padded_size'] = None
+        if 'append_masks' not in config_dict:
+            config_dict['append_masks'] = False
+        if 'dataset_file' in config_dict:
+            config_dict['train_dataset_file'] = config_dict['dataset_file']
+            config_dict['val_dataset_file'] = config_dict['dataset_file']
+            config_dict['test_dataset_file'] = 'test.csv'
         config = type('config', (), config_dict)
 
     with torch.cuda.device(device):
@@ -105,11 +113,8 @@ def predict(checkpoint_path, device, subset, tta_variant=None):
 
 if __name__ == '__main__':
     checkpoint_paths = [
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0123/models/_ckpt_epoch_2.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0124/models/_ckpt_epoch_2.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0134/models/_ckpt_epoch_4.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0234/models/_ckpt_epoch_4.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/1234/models/_ckpt_epoch_4.ckpt'
+        '/kolos/m2/ct/models/classification/rsna/0036_3x3_pretrained/models/_ckpt_epoch_2.ckpt',
     ]
 
+    predict(checkpoint_paths[0], 0, 'val', None)
     predict(checkpoint_paths[0], 0, 'val', 'hflip')
