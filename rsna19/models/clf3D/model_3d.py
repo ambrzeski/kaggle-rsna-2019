@@ -390,7 +390,7 @@ class ClassificationModelDPN(nn.Module):
 
         self.l1_4 = nn.Sequential(
             nn.Conv2d(1, base_model_l1_outputs, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(base_model_l1_outputs, eps=0.001),
+            nn.BatchNorm2d(base_model_l1_outputs, eps=0.001, momentum=0.02),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         )
@@ -456,6 +456,90 @@ class ClassificationModelDPN(nn.Module):
             return res
         else:
             return out
+
+import pytorchcv.models.airnet
+import pytorchcv.models.sepreresnet
+
+
+class ClassificationModelAirnet(nn.Module):
+    def __init__(self,
+                 base_model_features,
+                 base_model_l1_outputs,
+                 nb_features,
+                 combine_slices=5,
+                 combine_conv_features=128,
+                 dropout=0.0):
+        super().__init__()
+        self.combine_slices = combine_slices
+        self.dropout = dropout
+        self.nb_features = nb_features
+        self.base_model_features = base_model_features
+
+        self.base_model = pytorchcv.models.airnet.airnet50_1x64d_r16(pretrained=True)
+        self.base_model.features[0].conv1.conv = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
+
+        self.combine_conv_features = combine_conv_features
+        self.combine_conv = nn.Conv3d(base_model_features, self.combine_conv_features,
+                                      kernel_size=(combine_slices, 1, 1),
+                                      # padding=((combine_slices-1)//2, 0, 0)
+                                      )
+        self.fc = nn.Conv1d(self.combine_conv_features*2, nb_features, kernel_size=1)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        self.base_model.features[0].conv1.conv.requires_grad = True
+        self.base_model.features[0].conv1.bn.requires_grad = True
+        self.base_model.features[0].conv1.bn.train()
+
+    def unfreeze_encoder(self):
+        self.base_model.requires_grad = True
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs, output_per_pixel=False):
+        """
+        :param inputs: BxSxHxW
+        :param output_per_pixel:
+        :return:
+        """
+        res = []
+        batch_size = inputs.shape[0]
+        nb_input_slices = inputs.shape[1]
+
+        x = inputs.view(batch_size*nb_input_slices, 1, inputs.shape[2], inputs.shape[3])
+        x = self.base_model.features(x)
+        base_model_features = x.shape[1]
+        x = x.view(batch_size, nb_input_slices, base_model_features, x.shape[2], x.shape[3])  # BxSxCxHxW
+        x = x.permute((0, 2, 1, 3, 4))  # BxCxSxHxW
+        x = self.combine_conv(x)
+
+        if output_per_pixel:
+            res.append(F.conv3d(torch.cat([x, x], dim=1), self.fc.weight[:, :, None, None], self.fc.bias))
+
+        # x: BxCxSxHxW
+        avg_pool = F.avg_pool3d(x, (1,)+x.shape[3:])
+        max_pool = F.max_pool3d(x, (1,)+x.shape[3:])
+        avg_max_pool = torch.cat((avg_pool, max_pool), 1)
+        # x: Bx2CxSx1x1
+        x = avg_max_pool[:, :, :, 0, 0]
+
+        if self.dropout > 0:
+            x = F.dropout(x, self.dropout, self.training)
+
+        out = self.fc(x)  # BxCxS
+        # x: Bx2CxS
+        # out = out[None, :, :]
+        out = out.permute(0, 2, 1)  # BxSxC
+
+        if res:
+            res.append(out)
+            return res
+        else:
+            return out
+
 
 
 class WSO(nn.Module):
@@ -600,6 +684,13 @@ def classification_model_dpn68_combine_last(**kwargs):
                                   nb_features=6,
                                   base_model_l1_outputs=10,
                                   **kwargs)
+
+def classification_model_airnet50(**kwargs):
+    return ClassificationModelAirnet(base_model_features=2048,
+                                  nb_features=6,
+                                  base_model_l1_outputs=10,
+                                  **kwargs)
+
 
 if __name__ == '__main__':
     # test_combine_last_3d_wrapper()
