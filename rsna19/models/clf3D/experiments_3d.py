@@ -194,4 +194,53 @@ MODELS = {
         initial_lr=2e-5,
         accumulation_steps=1
     ),
+
+    'dpn68_384_5_planes_3d_dr0': ModelInfo(
+        factory=model_3d.classification_model_dpn68_combine_last,
+        use_3d=True,
+        args=dict(combine_slices=5, dropout=0, combine_conv_features=128),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=8,
+            combine_slices_padding=2,
+            convert_cdf=True),
+        batch_size=4,
+        optimiser='radam',
+        initial_lr=2e-5,
+        accumulation_steps=1
+    ),
+
+    'dpn68_384_5_planes_3d_dr0_cos': ModelInfo(
+        factory=model_3d.classification_model_dpn68_combine_last,
+        use_3d=True,
+        args=dict(combine_slices=5, dropout=0, combine_conv_features=128),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=8,
+            combine_slices_padding=2,
+            convert_cdf=True),
+        batch_size=4,
+        optimiser='radam',
+        initial_lr=2e-5,
+        scheduler='cos_restarts',
+        accumulation_steps=1
+    ),
+
+    'airnet50_384_5_planes_3d_dr0': ModelInfo(
+        factory=model_3d.classification_model_airnet50,
+        use_3d=True,
+        args=dict(combine_slices=5, dropout=0, combine_conv_features=128),
+        dataset_args=dict(
+            img_size=400,
+            center_crop=384,
+            num_slices=8,
+            combine_slices_padding=2,
+            convert_cdf=True),
+        batch_size=4,
+        optimiser='radam',
+        initial_lr=2e-5,
+        accumulation_steps=1
+    ),
 }
