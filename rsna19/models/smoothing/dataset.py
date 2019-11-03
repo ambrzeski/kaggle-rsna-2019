@@ -1,3 +1,5 @@
+import os
+import json
 import numpy as np
 import pandas as pd
 from more_itertools import windowed, flatten
@@ -9,10 +11,12 @@ from tqdm import tqdm
 def main(config):
     train_x, train_y, val_x, val_y = create_dataset(config)
 
-    np.save('train_x.npy', train_x)
-    np.save('train_y.npy', train_y)
-    np.save('val_x.npy', val_x)
-    np.save('val_y.npy', val_y)
+    os.makedirs(config.cache_dir, exist_ok=True)
+
+    np.save(config.train_x, train_x)
+    np.save(config.train_y, train_y)
+    np.save(config.val_x, val_x)
+    np.save(config.val_y, val_y)
 
 
 def create_dataset(config):

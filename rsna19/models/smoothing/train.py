@@ -7,10 +7,10 @@ from sklearn.metrics import log_loss
 
 
 def main(config):
-    train_x = torch.tensor(np.load('train_x.npy'), dtype=torch.float32)
-    train_y = torch.tensor(np.load('train_y.npy'), dtype=torch.float32)
-    val_x = torch.tensor(np.load('val_x.npy'), dtype=torch.float32)
-    val_y = torch.tensor(np.load('val_y.npy'), dtype=torch.float32)
+    train_x = torch.tensor(np.load(config.train_x), dtype=torch.float32)
+    train_y = torch.tensor(np.load(config.train_y), dtype=torch.float32)
+    val_x = torch.tensor(np.load(config.val_x), dtype=torch.float32)
+    val_y = torch.tensor(np.load(config.val_y), dtype=torch.float32)
 
     # undo sigmoid
     train_pred = train_x[:, :config.predictions_in]
