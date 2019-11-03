@@ -88,8 +88,8 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                                             interpolation=cv2.INTER_LINEAR,
                                             border_mode=cv2.BORDER_REPLICATE,
                                             p=0.7),
-            albumentations.HorizontalFlip(),
-            # albumentations.RandomRotate90(),
+            albumentations.Flip(),
+            albumentations.RandomRotate90(),
         ]),
         **{**model_info.dataset_args, "segmentation_oversample": 1}
     )
@@ -122,8 +122,8 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                                                 interpolation=cv2.INTER_LINEAR,
                                                 border_mode=cv2.BORDER_REPLICATE,
                                                 p=0.75),
-                albumentations.HorizontalFlip(),
-                # albumentations.RandomRotate90()
+                albumentations.Flip(),
+                albumentations.RandomRotate90()
             ]),
             **{**model_info.dataset_args, "num_slices": 1}
         )
@@ -170,7 +170,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     def criterium_mask(y_pred, y_true, have_segmentation):
         if not max(have_segmentation):
             return 0
-        return F.binary_cross_entropy(y_pred[have_segmentation], y_true[have_segmentation])
+        return F.binary_cross_entropy(y_pred[have_segmentation], y_true[have_segmentation]) * 10
 
     # criterium = nn.BCEWithLogitsLoss()
 
@@ -211,7 +211,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     model.module.unfreeze_encoder()
 
     for epoch_num in range(resume_epoch+1, 12):
-        if epoch_num > 2 and dataset_train_1_slice is not None:
+        if epoch_num > 3 and dataset_train_1_slice is not None:
             dataset_train_1_slice.segmentation_oversample = 1
 
         for phase in ['train', 'val']:
