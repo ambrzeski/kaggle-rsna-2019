@@ -12,8 +12,35 @@ from rsna19.models.clf2D.experiments import MODELS
 from rsna19.models.clf2D.train import build_model_str
 import albumentations
 import albumentations.pytorch
+import albumentations.augmentations.functional
 
 # import ttach as tta
+
+
+class Rotate90(albumentations.DualTransform):
+    """Rotate the input by 90 degrees.
+
+    Args:
+        p (float): probability of applying the transform. Default: 0.5.
+
+    Targets:
+        image, mask, bboxes, keypoints
+
+    Image types:
+        uint8, float32
+    """
+
+    def get_params_dependent_on_targets(self, params):
+        pass
+
+    def apply(self, img, **params):
+        return np.ascontiguousarray(np.rot90(img, 1))
+
+    def apply_to_bbox(self, bbox, **params):
+        return albumentations.augmentations.functional.bbox_rot90(bbox, 1, **params)
+
+    def apply_to_keypoint(self, keypoint, **params):
+        return albumentations.augmentations.functional.keypoint_rot90(keypoint, 1, **params)
 
 
 def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=None):
@@ -30,8 +57,8 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
         preprocess_func.append(albumentations.HorizontalFlip(always_apply=True))
     if 'v_flip' in mode:
         preprocess_func.append(albumentations.VerticalFlip(always_apply=True))
-    # if 'rot90' in mode:
-    #     preprocess_func.append(albumentations.RandomRotate90( always_apply=True))
+    if 'rot90' in mode:
+        preprocess_func.append(Rotate90(always_apply=True))
     # preprocess_func.append(albumentations.pytorch.ToTensorV2())
 
     dataset_valid = dataset.IntracranialDataset(
