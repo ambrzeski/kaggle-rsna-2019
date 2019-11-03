@@ -11,7 +11,7 @@ from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 from tqdm import tqdm
-from rsna19.data import dataset, dataset_3d
+from rsna19.data import dataset, dataset_3d_v2
 import albumentations
 import albumentations.pytorch
 import cv2
@@ -22,8 +22,75 @@ from rsna19.configs.base_config import BaseConfig
 from rsna19.models.commons import radam
 from rsna19.models.clf3D.experiments_3d import MODELS
 from torch.utils.tensorboard import SummaryWriter
+import math
 
 from rsna19.models.clf2D.train import build_model_str, log_metrics
+
+
+class CosineAnnealingLRWithRestarts(torch.optim.lr_scheduler._LRScheduler):
+    r"""Set the learning rate of each parameter group using a cosine annealing
+    schedule, where :math:`\eta_{max}` is set to the initial lr,
+    :math:`T_{mult}` is the multiplicative factor of T_max and
+    :math:`T_{cur}` is the number of epochs since the last restart in SGDR:
+    .. math::
+        \eta_t = \eta_{min} + \frac{1}{2}(\eta_{max} - \eta_{min})(1 +
+        \cos(\frac{T_{cur}}{T_{max}\cdot T_{mult}}\pi))
+    When last_epoch=-1, sets initial lr as lr.
+    It has been proposed in
+    `SGDR: Stochastic Gradient Descent with Warm Restarts`_.
+    Args:
+        optimizer (Optimizer): Wrapped optimizer.
+        T_max (int): Maximum number of iterations.
+        eta_min (float): Minimum learning rate. Default: 0.
+        last_epoch (int): The index of last epoch. Default: -1.
+        T_mult (float): Multiplicative factor of T_max. Default: 2.
+    .. _SGDR\: Stochastic Gradient Descent with Warm Restarts:
+        https://arxiv.org/abs/1608.03983
+    """
+
+    def __init__(self, optimizer, T_max, eta_min=0, last_epoch=-1, T_mult=2):
+        self.T_max = T_max
+        self.Ti = T_max
+        self.eta_min = eta_min
+        self.T_mult = T_mult
+        self.cycle = 0
+        super().__init__(optimizer, last_epoch)
+
+    def step(self, epoch=None, metrics=None):
+        if epoch is None:
+            epoch = self.last_epoch + 1
+            if epoch == self.Ti:
+                epoch = 0
+                self.cycle += 1
+        else:
+            self.cycle = int(math.floor(math.log(epoch / self.T_max * (self.T_mult - 1) + 1, self.T_mult)))
+            epoch -= sum([self.T_max * self.T_mult ** x for x in range(self.cycle)])
+        self.last_epoch = epoch
+        self.Ti = self.T_max * self.T_mult ** self.cycle
+        for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
+            param_group['lr'] = lr
+
+    def get_lr(self):
+        return [self.eta_min + (base_lr - self.eta_min) * (1 + math.cos(math.pi * self.last_epoch / self.Ti)) / 2
+                for base_lr in self.base_lrs]
+
+
+def check_CosineAnnealingLRWithRestarts():
+    conv1 = torch.nn.Conv2d(1, 1, 1)
+    opt = torch.optim.SGD([{'params': conv1.parameters()}], lr=0.05)
+    scheduler = CosineAnnealingLRWithRestarts(opt, T_max=8, T_mult=1.2)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=8)
+    epochs = list(range(100))
+    lr = []
+    for e in epochs:
+        scheduler.step(e)
+        lr.append(scheduler.get_lr())
+
+    plt.plot(epochs, lr)
+    plt.show()
+
+
+# check_CosineAnnealingLRWithRestarts()
 
 
 def train(model_name, fold, run=None, resume_epoch=-1):
@@ -54,17 +121,15 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     model = torch.nn.DataParallel(model).cuda()
     model = model.cuda()
 
-    dataset_module = dataset_3d
-
-    dataset_train = dataset_module.IntracranialDataset(
-        csv_file='5fold.csv',
+    dataset_train = dataset_3d_v2.IntracranialDataset(
+        csv_file='5fold-rev3.csv',
         folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
         random_slice=True,
         preprocess_func=albumentations.Compose([
-            albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.1, rotate_limit=30,
+            albumentations.ShiftScaleRotate(shift_limit=16./256, scale_limit=0.05, rotate_limit=30,
                                             interpolation=cv2.INTER_LINEAR,
                                             border_mode=cv2.BORDER_REPLICATE,
-                                            p=0.80),
+                                            p=0.75),
             albumentations.Flip(),
             albumentations.RandomRotate90(),
             albumentations.pytorch.ToTensorV2()
@@ -72,7 +137,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         **model_info.dataset_args
     )
 
-    dataset_valid = dataset_module.IntracranialDataset(
+    dataset_valid = dataset_3d_v2.IntracranialDataset(
         csv_file='5fold.csv',
         folds=[fold],
         random_slice=False,
@@ -92,7 +157,11 @@ def train(model_name, fold, run=None, resume_epoch=-1):
     milestones = [32, 48, 64]
     if model_info.optimiser_milestones:
         milestones = model_info.optimiser_milestones
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.2)
+
+    if model_info.scheduler == 'steps':
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.2)
+    elif model_info.scheduler == 'cos_restarts':
+        scheduler = CosineAnnealingLRWithRestarts(optimizer=optimizer, T_max=8, T_mult=1.2)
 
     print(f'Num training images: {len(dataset_train)} validation images: {len(dataset_valid)}')
 
@@ -128,11 +197,11 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         model.train()
         model.module.freeze_encoder()
         data_loader = data_loaders['train']
-        pre_fit_steps = len(dataset_train) // model_info.batch_size // 2
+        pre_fit_steps = len(dataset_train) // model_info.batch_size // 8
         data_iter = tqdm(enumerate(data_loader), total=pre_fit_steps)
         epoch_loss = []
-        #initial_optimizer = radam.RAdam(model.parameters(), lr=1e-3)
-        initial_optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+        initial_optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
+        # initial_optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
         for iter_num, data in data_iter:
             if iter_num > pre_fit_steps:
                 break
@@ -144,18 +213,18 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                 # loss.backward()
                 (loss / model_info.accumulation_steps).backward()
                 if (iter_num + 1) % model_info.accumulation_steps == 0:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 100.0)
                     initial_optimizer.step()
                     initial_optimizer.zero_grad()
                 epoch_loss.append(float(loss))
 
                 data_iter.set_description(f'Loss: Running {np.mean(epoch_loss[-100:]):1.4f} Avg {np.mean(epoch_loss):1.4f}')
+        del initial_optimizer
     model.module.unfreeze_encoder()
 
     phase_period = {
         'train': 1,
-        'val': 4,
-        'val_prev': 8,
+        'val': 2
     }
 
     for epoch_num in range(resume_epoch+1, 128):
@@ -183,7 +252,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                         if phase == 'train':
                             (loss / model_info.accumulation_steps).backward()
                             if (iter_num + 1) % model_info.accumulation_steps == 0:
-                                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                                torch.nn.utils.clip_grad_norm_(model.parameters(), 32.0)
                                 optimizer.step()
                                 optimizer.zero_grad()
 
