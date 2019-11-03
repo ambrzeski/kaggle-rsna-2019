@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import pretrainedmodels
+import pytorchcv.models.airnet
+import pytorchcv.models.airnext
+import pytorchcv.models.sepreresnet
 
 
 class ClassificationModelResnetCombineLast(nn.Module):
@@ -538,6 +541,86 @@ class InceptionResnetV2(nn.Module):
         return self.base_model.features(x)
 
 
+
+
+class AirNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.base_model = pytorchcv.models.airnet.airnet50_1x64d_r16(pretrained=True)
+        self.base_model.features[0].conv1.conv = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        self.base_model.features[0].conv1.conv.requires_grad = True
+        self.base_model.features[0].conv1.bn.requires_grad = True
+        self.base_model.features[0].conv1.bn.train()
+
+    def unfreeze_encoder(self):
+        self.base_model.train()
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs):
+        return self.base_model.features(inputs)
+
+
+class AirNext(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.base_model = pytorchcv.models.airnext.airnext50_32x4d_r2(pretrained=True)
+        self.base_model.features[0].conv1.conv = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        self.base_model.features[0].conv1.conv.requires_grad = True
+        self.base_model.features[0].conv1.bn.requires_grad = True
+        self.base_model.features[0].conv1.bn.train()
+
+    def unfreeze_encoder(self):
+        self.base_model.train()
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs):
+        return self.base_model.features(inputs)
+
+
+class SE_PreResNet_BC_26b(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.base_model = pytorchcv.models.sepreresnet.sepreresnetbc26b(pretrained=True)
+        self.base_model.features[0].conv = nn.Conv2d(
+            in_channels=1,
+            out_channels=64,
+            kernel_size=7,
+            stride=2,
+            padding=3,
+            bias=False)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        self.base_model.features[0].conv.requires_grad = True
+        self.base_model.features[0].bn.requires_grad = True
+        self.base_model.features[0].bn.train()
+
+    def unfreeze_encoder(self):
+        self.base_model.train()
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs):
+        return self.base_model.features(inputs)
+
+
 def classification_model_resnet34_combine_last(**kwargs):
     base_model = pretrainedmodels.resnet34()
     return ClassificationModelResnetCombineLast(
@@ -640,6 +723,36 @@ def classification_model_inception_resnet_v2(**kwargs):
     return BaseClassificationModel(
         base_model,
         base_model_features=1536,
+        nb_features=6,
+        **kwargs)
+
+
+def classification_model_airnet_50(**kwargs):
+    base_model = AirNet()
+    return BaseClassificationModel(
+        base_model,
+        base_model_features=2048,
+        combine_conv_features=128,
+        nb_features=6,
+        **kwargs)
+
+
+def classification_model_airnext_50(**kwargs):
+    base_model = AirNext()
+    return BaseClassificationModel(
+        base_model,
+        base_model_features=2048,
+        combine_conv_features=128,
+        nb_features=6,
+        **kwargs)
+
+
+def classification_model_se_preresnext26b(**kwargs):
+    base_model = SE_PreResNet_BC_26b()
+    return BaseClassificationModel(
+        base_model,
+        base_model_features=2048,
+        combine_conv_features=128,
         nb_features=6,
         **kwargs)
 
