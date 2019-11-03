@@ -1,31 +1,57 @@
 import json
-from torch.nn import functional as F
+
+import albumentations
+import cv2
+import numpy as np
 import os
+import pandas as pd
 import torch
+torch.multiprocessing.set_sharing_strategy('file_system')
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import numpy as np
-import pandas as pd
 
 from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.clf2Dc.classifier2dc import Classifier2DC
 
+TTA_TRANSFORMS = {
+    None: None,
+    'hflip': [albumentations.HorizontalFlip(True)],
+    'vflip': [albumentations.VerticalFlip(True)],
+    'lrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
+                                      value=0, always_apply=True)],
+    'rrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
+                                      value=0, always_apply=True)]
+}
 
-def predict(checkpoint_path, device, subset):
+
+def predict(checkpoint_path, device, subset, tta_variant=None):
     assert subset in ['train', 'val', 'test']
+    assert tta_variant in TTA_TRANSFORMS
+
     train_dir = os.path.join(os.path.dirname(checkpoint_path), '..')
     config_path = os.path.join(train_dir, 'version_0/config.json')
 
     checkpoint_name = os.path.basename(checkpoint_path).split('.')[0]
-    df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}.csv')
+    if tta_variant is None:
+        df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}.csv')
+    else:
+        df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}_{tta_variant}.csv')
     os.makedirs(os.path.dirname(df_out_path), exist_ok=True)
 
     with open(config_path, 'r') as f:
         config_dict = json.load(f)
         if 'dropout' not in config_dict:
             config_dict['dropout'] = 0
+        if 'padded_size' not in config_dict:
+            config_dict['padded_size'] = None
+        if 'append_masks' not in config_dict:
+            config_dict['append_masks'] = False
+        if 'dataset_file' in config_dict:
+            config_dict['train_dataset_file'] = config_dict['dataset_file']
+            config_dict['val_dataset_file'] = config_dict['dataset_file']
+            config_dict['test_dataset_file'] = 'test.csv'
         config = type('config', (), config_dict)
-
 
     with torch.cuda.device(device):
         checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
@@ -45,7 +71,8 @@ def predict(checkpoint_path, device, subset):
         else:
             folds = None
 
-        dataset = IntracranialDataset(config, folds, subset == 'test', False)
+        dataset = IntracranialDataset(config, folds, mode=subset, augment=False,
+                                      transforms=TTA_TRANSFORMS[tta_variant])
 
         all_paths = []
         all_study_id = []
@@ -86,11 +113,8 @@ def predict(checkpoint_path, device, subset):
 
 if __name__ == '__main__':
     checkpoint_paths = [
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0123/models/_ckpt_epoch_2.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0124/models/_ckpt_epoch_2.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0134/models/_ckpt_epoch_4.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0234/models/_ckpt_epoch_4.ckpt',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/1234/models/_ckpt_epoch_4.ckpt'
+        '/kolos/m2/ct/models/classification/rsna/0036_3x3_pretrained/models/_ckpt_epoch_2.ckpt',
     ]
 
-    predict(checkpoint_paths[4], 0, 'test')
+    predict(checkpoint_paths[0], 0, 'val', None)
+    predict(checkpoint_paths[0], 0, 'val', 'hflip')

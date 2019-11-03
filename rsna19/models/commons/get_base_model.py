@@ -19,6 +19,8 @@ def get_base_model(config):
         input_channels = config.multibranch_input_channels
     else:
         input_channels = config.num_slices
+        if config.append_masks:
+            input_channels *= 2
 
     _available_models = ['senet154', 'se_resnext50', 'resnet34', 'resnet18']
 
@@ -67,19 +69,21 @@ def get_base_model(config):
             model[0] = new_conv1
 
     if weights_path is not None:
-        if model_name not in ['senet154', 'se_resnext50']:
-            raise NotImplementedError
-        weights = load_base_weights(weights_path, input_channels)
+        if model_name in ['senet154', 'se_resnext50']:
+            conv1_str = '0.conv1.weight'
+        else:
+            conv1_str = '0.weight'
+        weights = load_base_weights(weights_path, input_channels, conv1_str)
         model.load_state_dict(weights)
 
     return model, num_features
 
 
-def load_base_weights(weights_path, input_channels):
+def load_base_weights(weights_path, input_channels, conv1_str):
     weights = torch.load(weights_path, map_location='cpu')['state_dict']
     weights = {k.replace('backbone.', ''): v for k, v in weights.items() if not k.startswith('last')}
 
-    conv1_weights = weights['0.conv1.weight']
+    conv1_weights = weights[conv1_str]
     new_shape = list(conv1_weights.shape)
     new_shape[1] = input_channels
     new_conv1_weights = torch.zeros(new_shape)
@@ -91,6 +95,6 @@ def load_base_weights(weights_path, input_channels):
     new_conv1_weights[:, new_mid_c - copied_channels // 2: new_mid_c + copied_channels // 2 + 1, :, :] = \
         conv1_weights[:, mid_c - copied_channels // 2: mid_c + copied_channels // 2 + 1, :, :]
 
-    weights['0.conv1.weight'] = new_conv1_weights
+    weights[conv1_str] = new_conv1_weights
 
     return weights

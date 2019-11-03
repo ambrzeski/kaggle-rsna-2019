@@ -11,31 +11,40 @@ import albumentations
 import albumentations.pytorch
 import cv2
 
-from rsna19.data.utils import normalize_train, load_scan_2dc
+from rsna19.data.utils import normalize_train, load_scan_2dc, load_seg_masks_2dc
 from rsna19.preprocessing.hu_converter import HuConverter
 
 
 class IntracranialDataset(Dataset):
     _HU_AIR = -1000
 
-    def __init__(self, config, folds, test=False, augment=False, use_cq500=False):
+    def __init__(self, config, folds, mode='train', augment=False, use_cq500=False, transforms=None):
         """
         :param folds: list of selected folds
+        :param mode: 'train', 'val' or 'test'
         :param return_labels: if True, labels will be returned with image
         """
         self.config = config
-        self.test = test
+        self.mode = mode
         self.augment = augment
+        self.additional_transforms = transforms
 
         if config.csv_root_dir is None:
             csv_root_dir = os.path.normpath(__file__ + '/../csv')
         else:
             csv_root_dir = config.csv_root_dir
 
-        dataset_file = 'test.csv' if test else self.config.dataset_file
+        dataset_file = None
+        if self.mode == 'train':
+            dataset_file = self.config.train_dataset_file
+        if self.mode == 'val':
+            dataset_file = self.config.val_dataset_file
+        if self.mode == 'test':
+            dataset_file = self.config.test_dataset_file
+
         data = pd.read_csv(os.path.join(csv_root_dir, dataset_file))
 
-        if not test:
+        if not mode == 'test':
             data = data[data.fold.isin(folds)]
 
         # protect from adding cq500 to validation
@@ -67,7 +76,8 @@ class IntracranialDataset(Dataset):
         slices_indices = list(range(middle_img_num - self.config.num_slices // 2,
                                     middle_img_num + self.config.num_slices // 2 + 1))
 
-        slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
+        slices_image = load_scan_2dc(middle_img_path, slices_indices, self.config.pre_crop_size,
+                                     self.config.padded_size)
 
         if self.config.use_cdf:
             slices_image = self.hu_converter.convert(slices_image)
@@ -78,7 +88,16 @@ class IntracranialDataset(Dataset):
 
         slices_image = (slices_image.transpose((1, 2, 0)) + 1) / 2
 
+        # Load and append segmentation masks
+        if self.config.append_masks:
+            seg_masks = load_seg_masks_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
+            seg_masks = seg_masks.transpose((1, 2, 0))
+            slices_image = np.concatenate((slices_image, seg_masks), axis=2)
+
         transforms = []
+        if self.additional_transforms is not None:
+            transforms.extend(self.additional_transforms)
+
         if self.augment:
             if self.config.vertical_flip:
                 transforms.append(albumentations.VerticalFlip(p=0.5))
@@ -100,7 +119,7 @@ class IntracranialDataset(Dataset):
             transforms.extend([
                 albumentations.HorizontalFlip(p=0.5),
                 albumentations.ShiftScaleRotate(
-                    shift_limit=0, scale_limit=0.15, rotate_limit=30,
+                    shift_limit=self.config.shift_limit, scale_limit=0.15, rotate_limit=30,
                     interpolation=cv2.INTER_LINEAR,
                     border_mode=cv2.BORDER_CONSTANT,
                     value=0,
@@ -126,7 +145,7 @@ class IntracranialDataset(Dataset):
             'slice_num': slice_num
         }
 
-        if not self.test:
+        if not self.mode == 'test':
             out['labels'] = torch.tensor(self.data.loc[idx, ['epidural',
                                                              'intraparenchymal',
                                                              'intraventricular',
@@ -150,7 +169,7 @@ if __name__ == '__main__':
         print(sample['labels'], img.shape, img.min(), img.max())
         if show_all_slices:
             for slice_ in img:
-                plt.imshow(slice_, cmap='gray')
+                plt.imshow(slice_, cmap='gray', vmin=-1, vmax=1)
                 plt.show()
         else:
             plt.imshow(img[img.shape[0] // 2], cmap='gray')

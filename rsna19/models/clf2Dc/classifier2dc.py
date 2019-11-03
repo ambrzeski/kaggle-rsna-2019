@@ -224,19 +224,19 @@ class Classifier2DC(pl.LightningModule):
     @pl.data_loader
     def train_dataloader(self):
         if self.config.balancing:
-            return DataLoader(IntracranialDataset(self.config, self.train_folds,
+            return DataLoader(IntracranialDataset(self.config, self.train_folds, mode='train',
                                                   augment=self.config.augment, use_cq500=self.config.use_cq500),
                               num_workers=self.config.num_workers,
                               batch_sampler=BalancedBatchSampler(self.config, self.train_folds))
         else:
-            return DataLoader(IntracranialDataset(self.config, self.train_folds,
-                                                  augment=self.config.augment),
+            return DataLoader(IntracranialDataset(self.config, self.train_folds, mode='train',
+                                                  augment=self.config.augment, use_cq500=self.config.use_cq500),
                               num_workers=self.config.num_workers,
                               batch_size=self.config.batch_size,
                               shuffle=True)
 
     @pl.data_loader
     def val_dataloader(self):
-        return DataLoader(IntracranialDataset(self.config, self.val_folds),
+        return DataLoader(IntracranialDataset(self.config, self.val_folds, mode='val'),
                           num_workers=self.config.num_workers,
                           batch_size=self.config.batch_size)

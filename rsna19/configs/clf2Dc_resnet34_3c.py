@@ -2,7 +2,7 @@ from rsna19.configs.base_config import BaseConfig
 
 
 class Config(BaseConfig):
-    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0036_3x3_pretrained_448/0123'
+    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0034_resnet34_3c/0123'
 
     train_dataset_file = '5fold.csv'
     val_dataset_file = '5fold.csv'
@@ -16,21 +16,21 @@ class Config(BaseConfig):
     backbone = 'resnet34'
 
     # 'imagenet', None or path to weights
-    # pretrained = 'imagenet'
-    pretrained = '/kolos/m2/ct/models/classification/rsna/0034_resnet34_3c/0123/models/_ckpt_epoch_3.ckpt'
+    pretrained = 'imagenet'
+    # pretrained = '/kolos/m2/ct/models/classification/rsna/0014_384/0123/models/_ckpt_epoch_2.ckpt'
 
     lr = 1e-4
-    batch_size = 24  # 16 (3, 512, 512) images fits on TITAN XP
-    accumulate_grad_batches = 2
-    dropout = 0
+    batch_size = 64  # 16 (3, 512, 512) images fits on TITAN XP
+    accumulate_grad_batches = 1
+    dropout = 0.5
     weight_decay = 0.001
     optimizer = 'radam'
 
     scheduler = {
         'name': 'flat_anneal',
-        'flat_iterations': 12000,
-        'anneal_iterations': 18000,
-        'min_lr': 1e-6
+        'flat_iterations': 8000,
+        'anneal_iterations': 12000,
+        'min_lr': 1e-7
     }
 
     # scheduler = {
@@ -43,7 +43,7 @@ class Config(BaseConfig):
     #     },
     # }
 
-    freeze_backbone_iterations = 8000
+    freeze_backbone_iterations = 2000
     freeze_first_layer = True
 
     gpus = [1]
@@ -51,13 +51,10 @@ class Config(BaseConfig):
 
     max_epoch = 20
 
-    append_masks = False
-    num_slices = 9  # must be odd
+    num_slices = 3  # must be odd
     pre_crop_size = 400
-    padded_size = 448
-    crop_size = 448
-    shift_limit = 0.1
-    random_crop = False
+    crop_size = 384
+    random_crop = True
     vertical_flip = False
     pixel_augment = False
     elastic_transform = False
@@ -72,7 +69,7 @@ class Config(BaseConfig):
     # 'epidural', 'intraparenchymal', 'intraventricular', 'subarachnoid', 'subdural', no_bleeding
     probas = [0.1, 0.14, 0.14, 0.14, 0.14, 0.34]
 
-    multibranch = True
+    multibranch = False
 
     # use 3d conv to merge features from different branches
     multibranch3d = False
