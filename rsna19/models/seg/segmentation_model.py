@@ -45,7 +45,7 @@ class SegmentationModel(pl.LightningModule):
         x = self.model.predict(x)
         return x
 
-    # training step and validation step should return tensfor or nested dicts of tensor for data parallel to work
+    # training step and validation step should return tensor or nested dicts of tensor for data parallel to work
     def training_step(self, batch, batch_nb):
         x, y = batch['image'], batch['seg']
         y_hat = self.forward(x)

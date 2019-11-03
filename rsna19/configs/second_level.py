@@ -21,7 +21,7 @@ class Config(BaseConfig):
 
     num_slices = 5
     predictions_in = num_slices * len(pred_columns)
-    append_area_feature = True
+    append_area_feature = False
 
     features_out = 6
     hidden = 128
