@@ -35,41 +35,6 @@ def generate_submission(prediction_paths, out_path, clip_eps=0.0):
 
 
 if __name__ == '__main__':
-#     prediction_paths ='''
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last/fold_2_ch74_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last/fold_1_ch80_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last/fold_0_ch100_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last/fold_4_ch90_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last/fold_3_ch78_normal.csv
-#         '''.split()
-# out_path = '/home/dmytro/ml/kaggle-rsna-2019/output/submissions/sub_17_resnet34_400_5_planes_combine_last_ch80_folds_0-4.csv'
-
-#     prediction_paths = '''
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/dpn68_384_5_planes_combine_last/fold_1_ch72_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/dpn68_384_5_planes_combine_last/fold_2_ch68_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/dpn68_384_5_planes_combine_last/fold_3_ch72_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/dpn68_384_5_planes_combine_last/fold_4_ch72_normal.csv
-# /home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/dpn68_384_5_planes_combine_last/fold_0_ch68_normal.csv
-# '''.split()
-#     out_path = '/home/dmytro/ml/kaggle-rsna-2019/output/submissions/sub_18_dpn68_384_5_planes_combine_last_ch72_folds_0-4.csv'
-
-    # generate_submission(prediction_paths, out_path, clip_eps=1e-3)
-    
-    prediction_paths = [
-        # '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_2_3/results/_ckpt_epoch_3_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_2_4/results/_ckpt_epoch_3_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_1_3_4/results/_ckpt_epoch_3_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0009_regularization/0_2_3_4/results/_ckpt_epoch_4_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0009_regularization/1_2_3_4/results/_ckpt_epoch_3_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_3/results/_ckpt_epoch_2_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0006_cdf2/0_1_2_4/results/_ckpt_epoch_2_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0007_window1/0_1_2_3/results/_ckpt_epoch_2_test.csv',
-        # '/kolos/m2/ct/models/classification/rsna/0008_window2/0_1_2_3/results/_ckpt_epoch_2_test.csv',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0123/results/_ckpt_epoch_2_test.csv',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0124/results/_ckpt_epoch_2_test.csv',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0134/results/_ckpt_epoch_4_test.csv',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/0234/results/_ckpt_epoch_4_test.csv',
-        '/kolos/m2/ct/models/classification/rsna/0014_384/1234/results/_ckpt_epoch_4_test.csv'
-    ]
-    out_path = '/kolos/m2/ct/data/rsna/submissions/submission9.csv'
+    prediction_paths = ['ensemble.csv']
+    out_path = 'final-submission.csv'
     generate_submission(prediction_paths, out_path, 1e-6)
