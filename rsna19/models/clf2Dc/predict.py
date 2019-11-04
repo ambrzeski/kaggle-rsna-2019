@@ -142,7 +142,9 @@ if __name__ == '__main__':
         (BaseConfig.model_outdir + '/0038_7s_res50_400', 'val', TTA_TRANSFORMS_RESNET50_7c_400),
         (BaseConfig.model_outdir + '/0038_7s_res50_400', 'test', TTA_TRANSFORMS_RESNET50_7c_400),
         (BaseConfig.model_outdir + '/0036_3x3_pretrained', 'val', TTA_TRANSFORMS_RESNET34_3x3),
-        (BaseConfig.model_outdir + '/0036_3x3_pretrained', 'test', TTA_TRANSFORMS_RESNET34_3x3)
+        (BaseConfig.model_outdir + '/0036_3x3_pretrained', 'test', TTA_TRANSFORMS_RESNET34_3x3),
+        (BaseConfig.model_outdir + '/0036_3x3_5_slices_pretrained', 'val', TTA_TRANSFORMS_RESNET34_3x3),
+        (BaseConfig.model_outdir + '/0036_3x3_5_slices_pretrained', 'test', TTA_TRANSFORMS_RESNET34_3x3)
     ]
 
     for model_home, subset, ttas in jobs:
