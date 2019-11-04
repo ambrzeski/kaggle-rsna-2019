@@ -857,17 +857,16 @@ MODELS = {
         args=dict(nb_input_slices=5, dropout=0),
         dataset_args=dict(
             img_size=400,
-            # center_crop=384,
             num_slices=5,
             convert_cdf=True,
             add_segmentation_masks=False
         ),
-        batch_size=8,
+        batch_size=12,
         optimiser='radam',
-        initial_lr=5e-5,
-        accumulation_steps=2,
+        initial_lr=2.5e-5,
+        accumulation_steps=1,
         single_slice_steps=5,
-        use_vflip=False
+        use_vflip=True
     ),
 
     'resnet18_384_5_planes_bn_f8': ModelInfo(
@@ -902,6 +901,22 @@ MODELS = {
         optimiser='radam',
         initial_lr=5e-5,
         accumulation_steps=1,
+        single_slice_steps=5
+    ),
+
+    'resnext50_400': ModelInfo(
+        factory=model_2dc.classification_model_resnext50,
+        args=dict(nb_input_slices=5, dropout=0.5),
+        dataset_args=dict(
+            img_size=400,
+            # center_crop=384,
+            num_slices=5,
+            convert_cdf=True,
+            add_segmentation_masks=False),
+        batch_size=8,
+        optimiser='radam',
+        initial_lr=2.5e-5,
+        accumulation_steps=2,
         single_slice_steps=5
     ),
 }

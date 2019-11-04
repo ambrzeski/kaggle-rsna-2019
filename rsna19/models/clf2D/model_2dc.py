@@ -621,6 +621,31 @@ class SE_PreResNet_BC_26b(nn.Module):
         return self.base_model.features(inputs)
 
 
+class ResNext50(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.base_model = pretrainedmodels.se_resnext50_32x4d()
+        self.base_model.layer0[0] = nn.Conv2d(1, 64, 3, stride=2, padding=1, bias=False)
+
+    def freeze_encoder(self):
+        self.base_model.eval()
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        self.base_model.layer0[0].requires_grad = True
+        self.base_model.layer0[1].requires_grad = True
+        self.base_model.layer0[1].train()
+
+    def unfreeze_encoder(self):
+        self.base_model.train()
+        for param in self.base_model.parameters():
+            param.requires_grad = True
+
+    def forward(self, inputs):
+        return self.base_model.features(inputs)
+
+
+
 def classification_model_resnet34_combine_last(**kwargs):
     base_model = pretrainedmodels.resnet34()
     return ClassificationModelResnetCombineLast(
@@ -753,6 +778,15 @@ def classification_model_se_preresnext26b(**kwargs):
         base_model,
         base_model_features=2048,
         combine_conv_features=128,
+        nb_features=6,
+        **kwargs)
+
+
+def classification_model_resnext50(**kwargs):
+    base_model = ResNext50()
+    return BaseClassificationModel(
+        base_model,
+        base_model_features=2048,
         nb_features=6,
         **kwargs)
 
