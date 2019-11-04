@@ -35,14 +35,6 @@ def generate_submission(prediction_paths, out_path, clip_eps=0.0):
 
 
 if __name__ == '__main__':
-    prediction_paths = '''
-TODO for stage 2: list all predictions here like:
-/home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last_var_dr0/fold_0_ch7_normal.csv
-/home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last_var_dr0/fold_1_ch7_normal.csv
-/home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last_var_dr0/fold_2_ch7_normal.csv
-/home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last_var_dr0/fold_3_ch7_normal.csv
-/home/dmytro/devbox/ml/kaggle-rsna-2019/output/prediction/test/resnet34_400_5_planes_combine_last_var_dr0/fold_4_ch7_normal.csv
- '''.split()
-    out_path = 'sub_stage2.csv'
-
-    generate_submission(prediction_paths, out_path, clip_eps=1e-5)
+    prediction_paths = ['ensemble.csv']
+    out_path = 'final-submission.csv'
+    generate_submission(prediction_paths, out_path, 1e-6)
