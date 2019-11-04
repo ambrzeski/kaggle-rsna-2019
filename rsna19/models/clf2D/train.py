@@ -217,7 +217,7 @@ def train(model_name, fold, run=None, resume_epoch=-1, use_apex=False):
         if 'amp' in checkpoint:
             amp.load_state_dict(checkpoint['amp'])
 
-    for epoch_num in range(resume_epoch+1, 12):
+    for epoch_num in range(resume_epoch+1, 7):
         for phase in ['train', 'val']:
             model.train(phase == 'train')
             epoch_loss = []

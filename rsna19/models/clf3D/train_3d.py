@@ -227,7 +227,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
         'val': 2
     }
 
-    for epoch_num in range(resume_epoch+1, 128):
+    for epoch_num in range(resume_epoch+1, 80):
         for phase in ['train', 'val']:
             if epoch_num % phase_period[phase] == 0:
                 model.train(phase == 'train')

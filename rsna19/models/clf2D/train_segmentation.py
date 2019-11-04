@@ -210,7 +210,7 @@ def train(model_name, fold, run=None, resume_epoch=-1):
                                           f' Running mask {np.mean(epoch_loss_mask[-500:]):1.4f} Mask {np.mean(epoch_loss_mask):1.4f}')
     model.module.unfreeze_encoder()
 
-    for epoch_num in range(resume_epoch+1, 12):
+    for epoch_num in range(resume_epoch+1, 8):
         if epoch_num > 3 and dataset_train_1_slice is not None:
             dataset_train_1_slice.segmentation_oversample = 1
 
