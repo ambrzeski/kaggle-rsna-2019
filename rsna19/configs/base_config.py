@@ -5,9 +5,14 @@ class BaseConfig:
     nb_folds = 5
 
     data_root = "/kolos/m2/ct/data/rsna/"
+
+    # Used for Dmytro's models
     checkpoints_dir = "../output/checkpoints"
     tensorboard_dir = "../output/tensorboard"
     oof_dir = "../output/oof"
+
+    # Used for Brainscan models
+    model_outdir = '/kolos/m2/ct/models/classification/rsna/'
 
     n_classes = 6
     csv_root_dir = None

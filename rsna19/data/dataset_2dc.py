@@ -89,7 +89,7 @@ class IntracranialDataset(Dataset):
         slices_image = (slices_image.transpose((1, 2, 0)) + 1) / 2
 
         # Load and append segmentation masks
-        if self.config.append_masks:
+        if hasattr(self.config, 'append_masks') and self.config.append_masks:
             seg_masks = load_seg_masks_2dc(middle_img_path, slices_indices, self.config.pre_crop_size)
             seg_masks = seg_masks.transpose((1, 2, 0))
             slices_image = np.concatenate((slices_image, seg_masks), axis=2)

@@ -1,16 +1,18 @@
 from rsna19.configs.base_config import BaseConfig
+from rsna19.configs import get_train_folds, get_val_folds_str
 
 
 class Config(BaseConfig):
-    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0034_resnet34_3c/0123'
+    train_out_dir = BaseConfig.model_outdir + '/0034_resnet34_3c'
 
     train_dataset_file = '5fold.csv'
     val_dataset_file = '5fold.csv'
     test_dataset_file = 'test.csv'
     data_version = '3d'  # '3d', 'npy', 'npy256' etc.
     use_cq500 = False
-    train_folds = [0, 1, 2, 3]
-    val_folds = [4]
+    val_folds = [0]
+    train_folds = get_train_folds(val_folds)
+    train_out_dir += '/fold' + get_val_folds_str(val_folds)
 
     # backbone = 'se_resnext50'
     backbone = 'resnet34'
@@ -46,7 +48,7 @@ class Config(BaseConfig):
     freeze_backbone_iterations = 2000
     freeze_first_layer = True
 
-    gpus = [1]
+    gpus = [0]
     num_workers = 3 * len(gpus)
 
     max_epoch = 20
@@ -54,6 +56,8 @@ class Config(BaseConfig):
     num_slices = 3  # must be odd
     pre_crop_size = 400
     crop_size = 384
+    padded_size = None
+    shift_limit = 0
     random_crop = True
     vertical_flip = False
     pixel_augment = False

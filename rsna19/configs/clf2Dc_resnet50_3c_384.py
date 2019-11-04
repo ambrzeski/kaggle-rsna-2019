@@ -1,10 +1,9 @@
-import glob
-
+from rsna19.configs import get_train_folds, get_val_folds_str
 from rsna19.configs.base_config import BaseConfig
 
 
 class Config(BaseConfig):
-    train_out_dir = '/kolos/m2/ct/models/classification/rsna/0014_384/'
+    train_out_dir = BaseConfig.model_outdir + '/0014_384'
     gpus = [0]
 
     train_dataset_file = '5fold.csv'
@@ -13,9 +12,8 @@ class Config(BaseConfig):
     data_version = '3d'  # '3d', 'npy', 'npy256' etc.
     use_cq500 = False
     val_folds = [0]
-    train_folds = list({0, 1, 2, 3, 4} - set(val_folds))
-    folds_str = "".join([str(i) for i in train_folds])
-    train_out_dir += '/' + folds_str
+    train_folds = get_train_folds(val_folds)
+    train_out_dir += '/fold' + get_val_folds_str(val_folds)
 
     backbone = 'se_resnext50'
 
@@ -36,7 +34,7 @@ class Config(BaseConfig):
         'min_lr': 1e-7
     }
 
-    freeze_backbone_iterations = 0  #?
+    freeze_backbone_iterations = 0
     freeze_first_layer = False
 
     num_workers = 3 * len(gpus)

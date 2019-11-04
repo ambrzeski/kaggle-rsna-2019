@@ -19,7 +19,7 @@ def get_base_model(config):
         input_channels = config.multibranch_input_channels
     else:
         input_channels = config.num_slices
-        if config.append_masks:
+        if hasattr(config, 'append_masks') and config.append_masks:
             input_channels *= 2
 
     _available_models = ['senet154', 'se_resnext50', 'resnet34', 'resnet18']
