@@ -51,6 +51,7 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
     print('\n', model_name, '\n')
 
     model = model_info.factory(**model_info.args)
+    model.output_segmentation = False
 
     preprocess_func = []
     if 'h_flip' in mode:
@@ -59,13 +60,13 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
         preprocess_func.append(albumentations.VerticalFlip(always_apply=True))
     if 'rot90' in mode:
         preprocess_func.append(Rotate90(always_apply=True))
-    # preprocess_func.append(albumentations.pytorch.ToTensorV2())
+
 
     dataset_valid = dataset.IntracranialDataset(
         csv_file='test.csv' if is_test else '5fold.csv',
         folds=[fold],
         preprocess_func=albumentations.Compose(preprocess_func),
-        return_labels=False,
+        return_labels=not is_test,
         is_test=is_test,
         **model_info.dataset_args
     )
@@ -76,18 +77,10 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
     model.load_state_dict(checkpoint['model_state_dict'])
     model = model.cuda()
 
-    # if mode == 'tta_d4':
-    #     model = tta.ClassificationTTAWrapper(model, tta.aliases.d4_transform())
-    #
-    # if mode == 'tta_flip':
-    #     model = tta.ClassificationTTAWrapper(model, tta.aliases.flip_transform())
-
-    batch_size = 16
-
     data_loader = DataLoader(dataset_valid,
                              shuffle=False,
-                             num_workers=16,
-                             batch_size=batch_size)
+                             num_workers=8,
+                             batch_size=model_info.batch_size*2)
 
     all_paths = []
     all_study_id = []
@@ -128,10 +121,26 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
 
 def predict_test(model_name, fold, epoch, mode='normal', run=None):
     run_str = '' if not run else f'_{run}'
-    prediction_dir = f'{BaseConfig.prediction_dir}/test/{model_name}{run_str}'
+    prediction_dir = f'{BaseConfig.prediction_dir}/{model_name}{run_str}/fold{fold}/predictions/'
     os.makedirs(prediction_dir, exist_ok=True)
-    df_out_path = f'{prediction_dir}/fold_{fold}_ch{epoch}_{mode}.csv'
-    predict(model_name=model_name, fold=fold, epoch=epoch, is_test=True, df_out_path=df_out_path, mode=mode, run=run)
+    df_out_path = f'{prediction_dir}/test_{mode}.csv'
+    print(df_out_path)
+    if os.path.exists(df_out_path):
+        print('Skip existing', df_out_path)
+    else:
+        predict(model_name=model_name, fold=fold, epoch=epoch, is_test=True, df_out_path=df_out_path, mode=mode, run=run)
+
+
+def predict_oof(model_name, fold, epoch, mode='normal', run=None):
+    run_str = '' if not run else f'_{run}'
+    prediction_dir = f'{BaseConfig.prediction_dir}/{model_name}{run_str}/fold{fold}/predictions/'
+    os.makedirs(prediction_dir, exist_ok=True)
+    df_out_path = f'{prediction_dir}/val_{mode}.csv'
+    print(df_out_path)
+    if os.path.exists(df_out_path):
+        print('Skip existing', df_out_path)
+    else:
+        predict(model_name=model_name, fold=fold, epoch=epoch, is_test=False, df_out_path=df_out_path, mode=mode, run=run)
 
 
 if __name__ == '__main__':
@@ -144,15 +153,22 @@ if __name__ == '__main__':
     parser.add_argument('--epoch', type=int, nargs='+')
     parser.add_argument('--mode', type=str, default=['normal'], nargs='+')
 
-    parser.add_argument('--resume_weights', type=str, default='')
-    parser.add_argument('--resume_epoch', type=int, default=-1)
-
     args = parser.parse_args()
     action = args.action
+    modes = args.mode
+    if modes == ['all']:
+        modes = ['normal', 'h_flip', 'v_flip', 'rot90']
 
     if action == 'predict_test':
         for fold in args.fold:
             for epoch in args.epoch:
-                for mode in args.mode:
+                for mode in modes:
                     print(f'fold {fold}, epoch {epoch}, {mode}')
                     predict_test(model_name=args.model, run=args.run, fold=fold, epoch=epoch, mode=mode)
+
+    if action == 'predict_oof':
+        for fold in args.fold:
+            for epoch in args.epoch:
+                for mode in modes:
+                    print(f'fold {fold}, epoch {epoch}, {mode}')
+                    predict_oof(model_name=args.model, run=args.run, fold=fold, epoch=epoch, mode=mode)

@@ -7,12 +7,13 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
-from rsna19.data import dataset_3d
+from rsna19.data import dataset_3d_v2
 from rsna19.configs.base_config import BaseConfig
 from rsna19.models.clf3D.experiments_3d import MODELS
 from rsna19.models.clf2D.train import build_model_str
 import albumentations
 import albumentations.pytorch
+from rsna19.models.clf2D.predict import Rotate90
 
 # import ttach as tta
 
@@ -31,11 +32,11 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
         preprocess_func.append(albumentations.HorizontalFlip(always_apply=True))
     if 'v_flip' in mode:
         preprocess_func.append(albumentations.VerticalFlip(always_apply=True))
-    # if 'rot90' in mode:
-    #     preprocess_func.append(albumentations.RandomRotate90( always_apply=True))
+    if 'rot90' in mode:
+        preprocess_func.append(Rotate90(always_apply=True))
     preprocess_func.append(albumentations.pytorch.ToTensorV2())
 
-    dataset_valid = dataset_3d.IntracranialDataset(
+    dataset_valid = dataset_3d_v2.IntracranialDataset(
         csv_file='test.csv' if is_test else '5fold.csv',
         folds=[fold],
         preprocess_func=albumentations.Compose(preprocess_func),
@@ -107,18 +108,26 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
 
 def predict_test(model_name, fold, epoch, mode='normal', run=None):
     run_str = '' if not run else f'_{run}'
-    prediction_dir = f'{BaseConfig.prediction_dir}/test/{model_name}{run_str}'
+    prediction_dir = f'{BaseConfig.prediction_dir}/{model_name}{run_str}/fold{fold}/predictions/'
     os.makedirs(prediction_dir, exist_ok=True)
-    df_out_path = f'{prediction_dir}/fold_{fold}_ch{epoch}_{mode}.csv'
-    predict(model_name=model_name, fold=fold, epoch=epoch, is_test=True, df_out_path=df_out_path, mode=mode, run=run)
+    df_out_path = f'{prediction_dir}/test_{mode}.csv'
+    print(df_out_path)
+    if os.path.exists(df_out_path):
+        print('Skip existing', df_out_path)
+    else:
+        predict(model_name=model_name, fold=fold, epoch=epoch, is_test=True, df_out_path=df_out_path, mode=mode, run=run)
 
 
 def predict_oof(model_name, fold, epoch, mode='normal', run=None):
     run_str = '' if not run else f'_{run}'
-    prediction_dir = f'{BaseConfig.prediction_dir}/oof/{model_name}{run_str}'
+    prediction_dir = f'{BaseConfig.prediction_dir}/{model_name}{run_str}/fold{fold}/predictions/'
     os.makedirs(prediction_dir, exist_ok=True)
-    df_out_path = f'{prediction_dir}/fold_{fold}_ch{epoch}_{mode}.csv'
-    predict(model_name=model_name, fold=fold, epoch=epoch, is_test=False, df_out_path=df_out_path, mode=mode, run=run)
+    df_out_path = f'{prediction_dir}/val_{mode}.csv'
+    print(df_out_path)
+    if os.path.exists(df_out_path):
+        print('Skip existing', df_out_path)
+    else:
+        predict(model_name=model_name, fold=fold, epoch=epoch, is_test=False, df_out_path=df_out_path, mode=mode, run=run)
 
 
 if __name__ == '__main__':
@@ -136,17 +145,20 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     action = args.action
+    modes = args.mode
+    if modes == ['all']:
+        modes = ['normal', 'h_flip', 'v_flip', 'rot90']
 
     if action == 'predict_test':
         for fold in args.fold:
             for epoch in args.epoch:
-                for mode in args.mode:
+                for mode in modes:
                     print(f'fold {fold}, epoch {epoch}, {mode}')
                     predict_test(model_name=args.model, run=args.run, fold=fold, epoch=epoch, mode=mode)
 
     if action == 'predict_oof':
         for fold in args.fold:
             for epoch in args.epoch:
-                for mode in args.mode:
+                for mode in modes:
                     print(f'fold {fold}, epoch {epoch}, {mode}')
                     predict_oof(model_name=args.model, run=args.run, fold=fold, epoch=epoch, mode=mode)

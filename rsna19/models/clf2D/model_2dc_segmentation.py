@@ -358,6 +358,8 @@ class ClassificationModelResnetCombineLastVariable3(nn.Module):
         self.dec3 = DecoderBlock(64 + filters * 8, filters * 4, level=2)
         self.fc_segmentation = nn.Conv2d(filters * 4, nb_segmentation_features, kernel_size=1)
 
+        self.output_segmentation = True
+
     def freeze_encoder(self):
         self.base_model.eval()
         for param in self.base_model.parameters():
@@ -428,7 +430,10 @@ class ClassificationModelResnetCombineLastVariable3(nn.Module):
         x = torch.relu(x)
         cls = self.fc2(x)
 
-        return cls, segmentation_result
+        if self.output_segmentation:
+            return cls, segmentation_result
+        else:
+            return cls
 
 
 class ResnetWeightedSegmentatation(nn.Module):
