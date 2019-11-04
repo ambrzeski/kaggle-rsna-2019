@@ -24,7 +24,7 @@ class Config(BaseConfig):
     sklearn_loss = False
 
     fold = "fold0"
-    cache_dir = Path('/kolos/m2/ct/models/classification/rsna-ready/cache/') / fold
+    cache_dir = Path('/kolos/m2/ct/models/classification/rsna-ready/cache_150_features/') / fold
     cache_dir = cache_dir if not append_area_feature else Path(str(cache_dir) + "_area")
 
     train_x = cache_dir / 'train_x.npy'
@@ -34,9 +34,10 @@ class Config(BaseConfig):
 
     models = [
         "0036_3x3_pretrained",
-        # "0038_7s_res50_400"                   # TODO uncomment when all predictions collected
-        # "dpn68_384_5_planes_combine_last",    # TODO bug with shape
+        "0038_7s_res50_400",
+        "dpn68_384_5_planes_combine_last",
         "resnet18_400",
         "resnet34_400_5_planes_combine_last_var_dr0",
-        # "resnet18_384_5_planes_bn_f8",        # TODO high loss
+        # "resnet18_384_5_planes_bn_f8",                # TODO high loss
+        # "airnet50_384"                                # TODO uncomment when ready
     ]

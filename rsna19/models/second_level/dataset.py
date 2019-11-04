@@ -38,7 +38,7 @@ def create_dataset(config):
         tmp_dfs[0][config.pred_columns] /= len(tmp_dfs)
         dfs[model] = tmp_dfs[0]
 
-    for model, df in dfs.items():
+    for i, (model, df) in enumerate(dfs.items()):
         print(model)
         df_areas = pd.read_csv(config.seg_areas_path)
 
@@ -46,14 +46,13 @@ def create_dataset(config):
         df = pd.merge(df, df_areas,  how='left', left_on=['study_id', 'slice_num'], right_on=['id', 'slice_number'])
         df.area = (df.area - df.area.mean()) / df.area.std()
 
-        np.random.seed(9)
-        study_ids = df.study_id.unique()
-        np.random.shuffle(study_ids)
-        train_ids = study_ids[:len(study_ids)//2]
-        val_ids = study_ids[len(study_ids)//2:]
+        if i == 0:
+            np.random.seed(9)
+            study_ids = df.study_id.unique()
+            np.random.shuffle(study_ids)
 
-        print(len(train_ids))
-        print(len(val_ids))
+            train_ids = study_ids[:len(study_ids)//2]
+            val_ids = study_ids[len(study_ids)//2:]
 
         train_df = df[df.study_id.isin(train_ids)]
         val_df = df[df.study_id.isin(val_ids)]
@@ -69,9 +68,6 @@ def create_dataset(config):
 
         train_x, train_y = create_split(train_df, train_ids, config)
         val_x, val_y = create_split(val_df, val_ids, config)
-
-        print(train_x.shape)
-        print(val_x.shape)
 
         train_x_folds.append(train_x)
         train_y_folds.append(train_y)
