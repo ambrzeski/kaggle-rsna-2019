@@ -61,14 +61,13 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
     if 'rot90' in mode:
         preprocess_func.append(Rotate90(always_apply=True))
 
-
     dataset_valid = dataset.IntracranialDataset(
         csv_file='test.csv' if is_test else '5fold.csv',
         folds=[fold],
         preprocess_func=albumentations.Compose(preprocess_func),
         return_labels=not is_test,
         is_test=is_test,
-        **model_info.dataset_args
+        **{**model_info.dataset_args, "add_segmentation_masks": False, "segmentation_oversample": 1}
     )
 
     model.eval()
