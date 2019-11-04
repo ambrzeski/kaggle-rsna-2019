@@ -32,6 +32,7 @@ class Config(BaseConfig):
     val_x = cache_dir / 'val_x.npy'
     val_y = cache_dir / 'val_y.npy'
 
+    # TODO for stage 2: enable/list all models trained as listed in readme
     models = [
         "0036_3x3_pretrained",
         "0038_7s_res50_400",
