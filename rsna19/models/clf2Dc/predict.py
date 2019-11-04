@@ -1,4 +1,6 @@
+import glob
 import json
+from pathlib import Path
 
 import albumentations
 import cv2
@@ -11,32 +13,55 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from rsna19.configs.base_config import BaseConfig
 from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.clf2Dc.classifier2dc import Classifier2DC
 
-TTA_TRANSFORMS = {
-    None: None,
-    'hflip': [albumentations.HorizontalFlip(True)],
-    'vflip': [albumentations.VerticalFlip(True)],
-    'lrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
-                                      value=0, always_apply=True)],
-    'rrotate': [albumentations.Rotate((-30, -30), interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT,
-                                      value=0, always_apply=True)]
+
+rot_params = {'interpolation': cv2.INTER_LINEAR, 'border_mode': cv2.BORDER_CONSTANT, 'value': 0, 'always_apply': True}
+
+TTA_TRANSFORMS_RESNET34_3x3 = {
+    'rcrop+rrot': [
+        albumentations.Rotate((15, 15), **rot_params),
+        albumentations.RandomCrop(384, 384)],
+    'rcrop+lrot': [
+        albumentations.Rotate((-15, -15), **rot_params),
+        albumentations.RandomCrop(384, 384)],
+    'rcrop+rrot+hflip': [
+        albumentations.HorizontalFlip(True),
+        albumentations.Rotate((15, 15), **rot_params),
+        albumentations.RandomCrop(384, 384)],
+    'rcrop+lrot+hflip': [
+        albumentations.HorizontalFlip(True),
+        albumentations.Rotate((-15, -15), **rot_params),
+        albumentations.RandomCrop(384, 384)],
+}
+
+ssr_params = {'shift_limit': 0.1, 'scale_limit': 0.05, 'rotate_limit': 15, 'interpolation': cv2.INTER_LINEAR,
+              'border_mode': cv2.BORDER_CONSTANT, 'value': 0, 'p': 0.9}
+
+TTA_TRANSFORMS_RESNET50_7c_400 = {
+    'ssr_1': [albumentations.ShiftScaleRotate(**ssr_params)],
+    'ssr_2': [albumentations.ShiftScaleRotate(**ssr_params)],
+    'ssr+hflip_1': [albumentations.HorizontalFlip(True), albumentations.ShiftScaleRotate(**ssr_params)],
+    'ssr+hflip_2': [albumentations.HorizontalFlip(True), albumentations.ShiftScaleRotate(**ssr_params)],
 }
 
 
-def predict(checkpoint_path, device, subset, tta_variant=None):
+def predict(checkpoint_path, device, subset, tta_transforms, tta_variant=None):
     assert subset in ['train', 'val', 'test']
-    assert tta_variant in TTA_TRANSFORMS
+    assert tta_variant in tta_transforms
 
     train_dir = os.path.join(os.path.dirname(checkpoint_path), '..')
     config_path = os.path.join(train_dir, 'version_0/config.json')
 
-    checkpoint_name = os.path.basename(checkpoint_path).split('.')[0]
     if tta_variant is None:
-        df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}.csv')
+        df_out_path = os.path.join(train_dir, f'predictions/{subset}_normal.csv')
     else:
-        df_out_path = os.path.join(train_dir, f'results/{checkpoint_name}_{subset}_{tta_variant}.csv')
+        df_out_path = os.path.join(train_dir, f'predictions/{subset}_{tta_variant}.csv')
+    if Path(df_out_path).exists():
+        print(f'Predictions {df_out_path} already exist. Skipping.')
+        return
     os.makedirs(os.path.dirname(df_out_path), exist_ok=True)
 
     with open(config_path, 'r') as f:
@@ -71,8 +96,7 @@ def predict(checkpoint_path, device, subset, tta_variant=None):
         else:
             folds = None
 
-        dataset = IntracranialDataset(config, folds, mode=subset, augment=False,
-                                      transforms=TTA_TRANSFORMS[tta_variant])
+        dataset = IntracranialDataset(config, folds, mode=subset, augment=False, transforms=tta_transforms[tta_variant])
 
         all_paths = []
         all_study_id = []
@@ -112,9 +136,23 @@ def predict(checkpoint_path, device, subset, tta_variant=None):
 
 
 if __name__ == '__main__':
-    checkpoint_paths = [
-        '/kolos/m2/ct/models/classification/rsna/0036_3x3_pretrained/models/_ckpt_epoch_2.ckpt',
+
+    gpu = 0
+    jobs = [
+        (BaseConfig.model_outdir + '/0038_7s_res50_400', 'val', TTA_TRANSFORMS_RESNET50_7c_400),
+        (BaseConfig.model_outdir + '/0038_7s_res50_400', 'test', TTA_TRANSFORMS_RESNET50_7c_400),
+        (BaseConfig.model_outdir + '/0036_3x3_pretrained', 'val', TTA_TRANSFORMS_RESNET34_3x3),
+        (BaseConfig.model_outdir + '/0036_3x3_pretrained', 'test', TTA_TRANSFORMS_RESNET34_3x3)
     ]
 
-    predict(checkpoint_paths[0], 0, 'val', None)
-    predict(checkpoint_paths[0], 0, 'val', 'hflip')
+    for model_home, subset, ttas in jobs:
+
+        model_dirs = glob.glob(model_home + "/*")
+        for model_dir in model_dirs:
+
+            checkpoint_path = sorted(glob.glob(model_dir + "/models/*.ckpt"))[-1]
+
+            for tta in ttas:
+
+                print(f"Calculating predictions for {checkpoint_path}, TTA: {tta}, subset: {subset}")
+                predict(checkpoint_path, gpu, subset, ttas, tta)
