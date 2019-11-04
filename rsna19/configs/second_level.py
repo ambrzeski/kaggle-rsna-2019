@@ -6,13 +6,6 @@ class Config(BaseConfig):
     class_weights = [1, 1, 1, 1, 1, 2]
     models_root = Path("/kolos/m2/ct/models/classification/rsna-ready")
     seg_areas_path = models_root / 'seg_areas.csv'
-    prediction_paths = {
-        4: models_root / '0036_3x3_pretrained/fold4/predictions/val_0.csv',
-        3: models_root / '0036_3x3_pretrained/fold3/predictions/val_0.csv',
-        2: models_root / '0036_3x3_pretrained/fold2/predictions/val_0.csv',
-        1: models_root / '0036_3x3_pretrained/fold1/predictions/val_0.csv',
-        0: models_root / '0036_3x3_pretrained/fold0/predictions/val_0.csv'
-    }
 
     gt_columns = ['gt_epidural', 'gt_intraparenchymal', 'gt_intraventricular',
                   'gt_subarachnoid', 'gt_subdural', 'gt_any']
@@ -30,10 +23,20 @@ class Config(BaseConfig):
 
     sklearn_loss = False
 
-    cache_dir = Path('cache')
+    fold = "fold0"
+    cache_dir = Path('/kolos/m2/ct/models/classification/rsna-ready/cache/') / fold
     cache_dir = cache_dir if not append_area_feature else Path(str(cache_dir) + "_area")
 
     train_x = cache_dir / 'train_x.npy'
     train_y = cache_dir / 'train_y.npy'
     val_x = cache_dir / 'val_x.npy'
     val_y = cache_dir / 'val_y.npy'
+
+    models = [
+        "0036_3x3_pretrained",
+        # "0038_7s_res50_400"                   # TODO uncomment when all predictions collected
+        # "dpn68_384_5_planes_combine_last",    # TODO bug with shape
+        "resnet18_400",
+        "resnet34_400_5_planes_combine_last_var_dr0",
+        # "resnet18_384_5_planes_bn_f8",        # TODO high loss
+    ]
