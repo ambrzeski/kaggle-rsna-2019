@@ -5,7 +5,7 @@ from rsna19.configs.base_config import BaseConfig
 
 
 class Config(BaseConfig):
-    train_out_dir = BaseConfig.model_outdir + '/0036_3x3_pretrained'
+    train_out_dir = BaseConfig.model_outdir + '/0036_3x3_5_slices_pretrained'
 
     train_dataset_file = '5fold.csv'
     val_dataset_file = '5fold.csv'
