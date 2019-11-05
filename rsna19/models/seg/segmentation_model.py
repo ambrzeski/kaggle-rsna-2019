@@ -25,7 +25,7 @@ class SegmentationModel(pl.LightningModule):
             self.model = smp.Unet(config.backbone, classes=config.n_classes, activation='sigmoid', encoder_weights=None)
 
             if config.pretrained is not None:
-                weights = load_base_weights(config.pretrained, 3)
+                weights = load_base_weights(config.pretrained, 3, '0.conv1.weight')
                 weights = {'layer' + k: v for k, v in weights.items()}
                 weights['last_linear.bias'] = None
                 weights['last_linear.weight'] = None
