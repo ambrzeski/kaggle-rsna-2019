@@ -98,14 +98,14 @@ def train(model_name, fold, run=None, resume_epoch=-1, use_apex=False):
         ]
 
     dataset_train = dataset.IntracranialDataset(
-        csv_file='5fold-rev3.csv',
+        csv_file='5fold-test-rev3.csv',
         folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
         preprocess_func=albumentations.Compose(augmentations),
         **model_info.dataset_args
     )
 
     dataset_valid = dataset.IntracranialDataset(
-        csv_file='5fold.csv',
+        csv_file='5fold-test-rev3.csv',
         folds=[fold],
         preprocess_func=None,
         **model_info.dataset_args
@@ -140,14 +140,14 @@ def train(model_name, fold, run=None, resume_epoch=-1, use_apex=False):
             ]
 
         dataset_train_1_slice = dataset.IntracranialDataset(
-            csv_file='5fold-rev3.csv',
+            csv_file='5fold-test-rev3.csv',
             folds=[f for f in range(BaseConfig.nb_folds) if f != fold],
             preprocess_func=albumentations.Compose(augmentations),
             **{**model_info.dataset_args, "num_slices": 1}
         )
 
         dataset_valid_1_slice = dataset.IntracranialDataset(
-            csv_file='5fold.csv',
+            csv_file='5fold-test-rev3.csv',
             folds=[fold],
             preprocess_func=None,
             **{**model_info.dataset_args, "num_slices": 1}
