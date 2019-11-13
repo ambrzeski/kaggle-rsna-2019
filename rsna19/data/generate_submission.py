@@ -37,5 +37,9 @@ def generate_submission(prediction_paths, out_path, clip_eps=0.0):
 if __name__ == '__main__':
     # TODO for stage 2: list all predictions paths from all models and TTA for sub 1 or output of l2 model for sub2
     prediction_paths = ['ensemble.csv']
-    out_path = 'final-submission.csv'
+    out_path = 'final-submission_stage2_1.csv'
     generate_submission(prediction_paths, out_path, 1e-6)
+
+    prediction_paths = ['pred_l2.csv']
+    out_path = 'final-submission_stage2_2.csv'
+    generate_submission(prediction_paths, out_path, 1e-5)

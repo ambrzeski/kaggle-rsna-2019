@@ -62,7 +62,7 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
         preprocess_func.append(Rotate90(always_apply=True))
 
     dataset_valid = dataset.IntracranialDataset(
-        csv_file='test.csv' if is_test else '5fold.csv',
+        csv_file='test2.csv' if is_test else '5fold.csv',
         folds=[fold],
         preprocess_func=albumentations.Compose(preprocess_func),
         return_labels=not is_test,

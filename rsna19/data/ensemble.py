@@ -6,7 +6,7 @@ from tqdm import tqdm
 from rsna19.configs.base_config import BaseConfig
 
 
-PREDICTIONS_QUERY = BaseConfig.model_outdir + '/*/*/predictions'
+PREDICTIONS_QUERY = BaseConfig.model_outdir + '/*/*/predictions_stage2'
 SMOOTHEN = False
 OUT = 'ensemble.csv'
 

@@ -9,22 +9,28 @@ from tqdm import tqdm
 
 
 def main(config):
-    x, y = create_dataset(config)
+    x, y = create_dataset(config, pred_type='val', stage='stage1')
 
     os.makedirs(config.cache_dir, exist_ok=True)
 
     np.save(config.cache_dir / "x.npy", x)
     np.save(config.cache_dir / "y.npy", y)
 
+    # to make sure it does not fail as test prediction have no gt fields
+    config.gt_columns = config.pred_columns
+    x, y = create_dataset(config, pred_type='test', stage='stage2')
 
-def create_dataset(config):
+    np.save(config.cache_dir / "x_test.npy", x)
+
+
+def create_dataset(config, pred_type, stage):
     x_folds = []
     y_folds = []
     dfs = {}
 
     for model in config.models:
         tmp_dfs = []
-        for path in glob(str(config.models_root / model / config.fold / "predictions" / "val_*.csv")):
+        for path in glob(str(config.models_root / model / config.fold / f"predictions_{stage}" / f"{pred_type}_*.csv")):
             print(path)
             tmp_dfs.append(pd.read_csv(path))
 
@@ -42,8 +48,9 @@ def create_dataset(config):
         gt = df[config.gt_columns].to_numpy()
         pred = df[config.pred_columns].to_numpy()
 
-        init_log_loss = log_loss(gt.flatten(), pred.flatten(), sample_weight=config.class_weights * gt.shape[0])
-        print(f'{init_log_loss}')
+        if pred_type == 'val':
+            init_log_loss = log_loss(gt.flatten(), pred.flatten(), sample_weight=config.class_weights * gt.shape[0])
+            print(f'{init_log_loss}')
 
         x, y = create_split(df, study_ids, config)
 
