@@ -36,7 +36,7 @@ def create_dataset(config):
 
     for i, (model, df) in enumerate(dfs.items()):
         print(model)
-        df = df.sort_values(by=['study_id'])
+        df = df.sort_values(by=['study_id', 'slice_num'])
         study_ids = df.study_id.unique()
 
         gt = df[config.gt_columns].to_numpy()
