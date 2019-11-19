@@ -134,6 +134,10 @@ def predict(checkpoint_path, device, subset, tta_transforms, tta_variant=None):
         'path': all_paths, 'study_id': all_study_id, 'slice_num': all_slice_num})), axis=1)
     df.to_csv(df_out_path, index=False)
 
+    # Free GPU memory
+    del model
+    torch.cuda.empty_cache()
+
 
 if __name__ == '__main__':
 
