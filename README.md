@@ -5,10 +5,10 @@ Solution overview: <kaggle-discussion-link>
 Reproduction instructions:
 * [Data conversion](#data-conversion)
 * [Dataset files](#dataset-files)
-* [Training models 1/2 (Dmytro's models)](#training-models-1\/2-(dmytro's-models))
-* [Training models 2/2 (BrainScan models)](#training-models-2\/2-(brainscan-models))
-* [Generating predictions for challenge data 1/2 (Dmytro's models)](#generating-predictions-for-challenge-data-1\/2-(dmytro's-models))
-* [Generating predictions for challenge data 2/2 (BrainScan models)](#generating-predictions-for-challenge-data-2\/2-(brainscan-models))
+* [Training models 1/2 (Dmytro's models)](#train-dmytro)
+* [Training models 2/2 (BrainScan models)](#train-brainscan)
+* [Generating predictions for challenge data 1/2 (Dmytro's models)](#predict-dmytro)
+* [Generating predictions for challenge data 2/2 (BrainScan models)](#predict-brainscan)
 * [Second level model and generating final predictions](#second-level-model-and-generating-final-predictions)
 * [Testing on new data](#testing-on-new-data)
 
@@ -17,22 +17,27 @@ Reproduction instructions:
 
 Project source is expected to operate on a converted form of challenge data, involving e.g. changing directory structure and image format. The new directory structure generated below will however create symlinks to the original data, so the original data should be kept in original location after completing data conversion process.
 
-First you need to download the Kaggle data, including: stage_1_train_images, stage_1_test_images, stage_2_test_images, stage_1_train.csv and stage_2_train.csv. After downloading the data, open project config file located at:
+First you need to download the Kaggle data, including: stage_1_train_images, stage_1_test_images, stage_2_test_images, stage_1_train.csv and stage_2_train.csv. After downloading the data, open project config file located at rsna19/config.py:
 
 
-```
-rsna19/config.py
-----------------
-
+```python
 class config:
     train_dir = '/kolos/storage/ct/data/rsna/stage_1_train_images'
     test_dir = '/kolos/storage/ct/data/rsna/stage_1_test_images'
     labels_path = "/kolos/storage/ct/data/rsna/stage_1_train.csv"
 
     data_root = "/kolos/m2/ct/data/rsna/"
+    
+    # Used for Dmytro's models
+    checkpoints_dir = "../output/checkpoints"
+    tensorboard_dir = "../output/tensorboard"
+    oof_dir = "../output/oof"
+
+    # Used for Brainscan models
+    model_outdir = '/kolos/m2/ct/models/classification/rsna/'
 ```
 
-Modify train_dir, test_dir and labels_path variables to make them point to appropriate data paths on your hard drive. Also, modify the data_root variable to indicate output directory, where the converted data should be saved.
+Modify train_dir, test_dir and labels_path variables to make them point to appropriate data paths on your hard drive. Also, modify the data_root variable to indicate output directory, where the converted data should be saved. Finally, set models output paths to desired locations, which will be used later during trainings.
 
 Next, three scripts should be executed to perform the full process of conversion. The scripts can be run right away if you open the project in PyCharm. Otherwise you may need add project package to PYTHONPATH:
 
@@ -71,6 +76,7 @@ In rsna19/data/csv directory you can find a set .csv dataset files defining trai
 
 
 ## Training models 1/2 (Dmytro's models)
+<a name="train-dmytro"></a>
 
 For training stage 1 models run the following commands for folds 0-4:
 
@@ -91,6 +97,7 @@ $ python models/clf2D/train.py train --model resnext50_400 --fold 0 --apex
 
 
 ## Training models 2/2 (BrainScan models)
+<a name="train-brainscan"></a>
 
 First you need to train baseline models that are used for initiating weights in final trainings. Trainings are conducted by running rsna19/models/clf2Dc/train.py script with appropriate config imported at the top of the file instead of the default place of ‘clf2Dc’. For example, to train train 'clf2Dc_resnet34_3c' config, change:
 
@@ -120,6 +127,8 @@ In stage 2 we trained to additional models (make sure to set 5fold-test.csv for 
 
 
 ## Generating predictions for challenge data 1/2 (Dmytro's models)
+<a name="predict-dmytro"></a>
+
 Run the following set of commands for folds 0-4:
 
 ```
@@ -148,6 +157,7 @@ $ python models/clf2D/predict.py predict_test --model resnext50_400 --epoch 6 --
 ```
 
 ## Generating predictions for challenge data 2/2 (BrainScan models)
+<a name="predict-brainscan"></a>
 
 Calculate model predictions including TTAs by running: 
 
@@ -171,4 +181,11 @@ $ python rsna19/models/second_level/dataset2.py
 
 ## Testing on new data
 
-Unfortunately, as of now we don't provide a script to generate predictions on new data directly. However, if you can save the new data in the same format as challenge data, you can use the instructions above to preprocess the data and run inference. For this purpose, simply ...
+Unfortunately, as of now we don't provide a script to generate predictions on new data directly. However, if you can save the new data in the same format as challenge data, you can use the instructions above to preprocess the data and run inference.
+
+Specifically, you need take the following steps:
+* set the path to the new test data directory in 'test_dir' in 'rsna19/config.py'
+* continue with data conversion steps
+* generate new test .csv file using rsna19/data/notebooks/generate_folds.ipynb notebook
+* update test .csv path in appropriate prediction scripts first
+* run the predictions steps using the new test .csv file 
