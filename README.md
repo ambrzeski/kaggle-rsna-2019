@@ -1,10 +1,23 @@
-# Kaggle RSNA 2019
+# Kaggle RSNA 2019 - 8th place solution
 
-## Before using the code
+Solution overview: <kaggle-discussion-link>
+
+Reproduction instructions:
+* [Data conversion](#data-conversion)
+* [Dataset files](#dataset-files)
+* [Training models 1/2 (Dmytro's models)](#training-models-1\/2-(dmytro's-models))
+* [Training models 2/2 (BrainScan models)](#training-models-2\/2-(brainscan-models))
+* [Generating predictions for challenge data 1/2 (Dmytro's models)](#generating-predictions-for-challenge-data-1\/2-(dmytro's-models))
+* [Generating predictions for challenge data 2/2 (BrainScan models)](#generating-predictions-for-challenge-data-2\/2-(brainscan-models))
+* [Second level model and generating final predictions](#second-level-model-and-generating-final-predictions)
+* [Testing on new data](#testing-on-new-data)
+
+
+## Data conversion
 
 Project source is expected to operate on a converted form of challenge data, involving e.g. changing directory structure and image format. The new directory structure generated below will however create symlinks to the original data, so the original data should be kept in original location after completing data conversion process.
 
-First you need to download the Kaggle data, including: stage_1_train_images, stage_1_test_images, and stage_1_train.csv. After downloading the data, open project config file located at:
+First you need to download the Kaggle data, including: stage_1_train_images, stage_1_test_images, stage_2_test_images, stage_1_train.csv and stage_2_train.csv. After downloading the data, open project config file located at:
 
 
 ```
@@ -34,38 +47,128 @@ $ python rsna19/data/scripts/create_dataframe.py
 # Create new directory structure and symlinks to original dicoms
 $ python rsna19/data/scripts/create_symlinks.py
 
-# Export dicom images (slices) to:
-#   - npy arrays - for faster loading during training (>3x faster)
-#   - png images - for easier viewing and browsing the images
+# Convert dicom images (slices) to npy arrays and pngs images
 $ python rsna19/data/scripts/convert_dataset.py
+$ python rsna19/data/scripts/prepare_3d_data.py
 ```
 
-Now you can safely use project's pytorch data loader class for your training. For example, if you want to read the data for 2D classification, using four of the first folds for training and the last one for validation, you can do:
+As a result of the conversion, for each examination a set of subdirs will be created:
+
+* /dicom - original dicom files
+* /png - png images with drawn labels for easier viewing and browsing
+* /npy - slices saved as numpy arrays for faster loading during training (>3x faster)
+* /3d - transformed slices that are used for actual trainings, transforms include fixing scan gantry tilt and 400x400 crop in x and y dimensions around volume center of mass
+
+
+## Dataset files
+
+In rsna19/data/csv directory you can find a set .csv dataset files defining train/val/test splits, cross-validation splits and samples labels. The dataset files were generated using rsna19/data/notebooks/generate_folds.ipynb notebook. The most significant dataset files are:
+
+* 5fold.csv - stage 1 training data sample split into 5 folds
+* 5folds-rev3.csv - same as above, but labels for 196 are modified basing on our manual annotation of scans
+* 5fold-test.csv - stage 2 training data (stage 1 extended with stage 1 test data), split into 5 fold - unfortunately, as it turned out later, patient leaks between folds occured in this split
+* 5folds-test-rev3.csv - same as above, but labels for 196 are modified basing on our manual annotation of scans
+
+
+## Training models 1/2 (Dmytro's models)
+
+For training stage 1 models run the following commands for folds 0-4:
 
 ```
-train_data = IntracranialDataset('5fold.csv', folds=[0, 1, 2, 3], return_labels=True)
-val_data = IntracranialDataset('5fold.csv', folds=[4], return_labels=True)
+$ python models/clf2D/train.py train --model resnet18_400 --fold 0
+$ python models/clf2D/train.py train --model resnet34_400_5_planes_combine_last_var_dr0 --fold 0
+$ python models/clf2D/train_segmentation.py train --model resnet18_384_5_planes_bn_f8 --fold 0
+$ python models/clf3D/train_3d.py train --model dpn68_384_5_planes_combine_last --fold 0
+$ python models/clf2D/train.py train --model airnet50_384 --fold 0 --apex
 ```
 
-5fold.csv is a dataset file including all the training data, split into 5 folds. The file is located in rsna19/data/csv.
-
-
-## Notes on diagnostic windows
-
-* it seems to be a common belief (used also in the ResNeXt 32x8d kernel) that dicom images should be 'windowed' after loading using windowing metadata of the particular dicom image, as here:
+For stage 2 models run the following for folds 0-4:
 
 ```
-img_min = window_center - window_width//2
-img_max = window_center + window_width//2
-img[img<img_min] = img_min
-img[img>img_max] = img_max
+$ python models/clf2D/train.py train --model se_preresnext26b_400 --fold 0 --apex
+$ python models/clf2D/train.py train --model resnext50_400 --fold 0 --apex
 ```
-* however window parameters from dicom metadata are just suggested window settings for given image based on CT reconstruction parameters, which are not optimized in any way for pathologies visible in the scan
-* the window parameters are automatically ignored by radiologists when reading scans using professional dicom viewers
-* moreover, window parameters in dicoms vary greatly throughout the dataset
-* applying different windows to scans results in discarding normalized and scaled HU intensity values, which are meaningul for the diagnosis - e.g. water has 0 HU value and should have same intensity on all scans, while in this approach usually have different intensity values
-* hence we should apply one fixed windowing method for all scans (optimized for enhancing hemorrhages) or not apply windowing at all
-* the only reason why windowing is used in clinical practise are the limitations of human vision in distinguishing grayscale tones
-* this limitation does not affect ConvNets, which should easily be able to find the optimal range of intensity values that are meaningful for detecting hemorrhages
-* hence, for now we do not apply windowing at all, we just pass HU values in their full resolution (using 16-bit representations)
-* we will run some experiments to see whether a unified, hemorrhage-oriented (and maybe non-linear) window might improve the model accuracy
+
+
+## Training models 2/2 (BrainScan models)
+
+First you need to train baseline models that are used for initiating weights in final trainings. Trainings are conducted by running rsna19/models/clf2Dc/train.py script with appropriate config imported at the top of the file instead of the default place of ‘clf2Dc’. For example, to train train 'clf2Dc_resnet34_3c' config, change:
+
+```python
+from rsna19.configs.clf2Dc import Config
+```
+
+to:
+
+```python
+from rsna19.configs.clf2Dc_resnet34_3c import Config
+```
+ 
+Also each training must be repeated 5 times with different ‘val_folds’ attributes (from [0] to [4]), modified in appropriate config files. You can also change gpu used for training using ‘gpu’ attribute.
+
+Configs to train for baseline models:
+* clf2Dc_resnet34_3c.py
+* clf2Dc_resnet50_3c_384.py
+
+Then final models that we trained for stage 1 can be trained using configs:
+* clf2Dc_resnet34_3x3.py
+* clf2Dc_resnet50_7c_400.py
+
+In stage 2 we trained to additional models (make sure to set 5fold-test.csv for both 'train_dataset_file' and 'val_dataset_file' in config files):
+* clf2Dc_resnet34_3x3_5_slices.py
+* clf2Dc_resnet34_3x3.py
+
+
+## Generating predictions for challenge data 1/2 (Dmytro's models)
+Run the following set of commands for folds 0-4:
+
+```
+# Stage 1 models out-of-fold predictions
+$ python models/clf2D/predict.py predict_oof --model resnet18_400 --epoch 6 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_oof --model resnet34_400_5_planes_combine_last_var_dr0 --epoch 7 --fold 0 --mode all
+$ python models/clf3D/predict.py predict_oof --model dpn68_384_5_planes_combine_last --epoch 72 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_oof --model resnet18_384_5_planes_bn_f8 --epoch 6 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_oof --model airnet50_384 --epoch 6 --fold 0 --mode all
+
+# Stage 1 models test predictions
+$ python models/clf2D/predict.py predict_test --model resnet18_400 --epoch 6 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_test --model resnet34_400_5_planes_combine_last_var_dr0 --epoch 7 --fold 0 --mode all
+$ python models/clf3D/predict.py predict_test --model dpn68_384_5_planes_combine_last --epoch 72 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_test --model resnet18_384_5_planes_bn_f8 --epoch 6 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_test --model airnet50_384 --epoch 6 --fold 0 --mode all
+
+# Stage 2 models out-of-fold predictions
+$ python models/clf2D/predict.py predict_oof --model se_preresnext26b_400 --epoch 6 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_oof --model resnext50_400 --epoch 6 --fold 0 --mode all
+
+# Stage 2 models test predictions
+$ python models/clf2D/predict.py predict_test --model se_preresnext26b_400 --epoch 6 --fold 0 --mode all
+$ python models/clf2D/predict.py predict_test --model resnext50_400 --epoch 6 --fold 0 --mode all
+
+```
+
+## Generating predictions for challenge data 2/2 (BrainScan models)
+
+Calculate model predictions including TTAs by running: 
+
+```
+$ python rsna19/models/clf2Dc/predict.py
+```
+
+## Second level model and generating final predictions
+
+Make sure that all models are copied to common directory, so that the directory structure matches the following form: 
+
+```
+{model_outdir}/{model_name}/{fold}/predictions/{predictions.csv}
+```
+Set path to this directory in rsna19/configs/base_config.Config.model_outdir. Next, generate the dataset for the second level model by running the following script for each of 5 folds (fold name can be specified in kaggle-rsna-2019/rsna19/configs/second_level.py):
+
+```
+$ python rsna19/models/second_level/dataset2.py
+```
+
+
+## Testing on new data
+
+Unfortunately, as of now we don't provide a script to generate predictions on new data directly. However, if you can save the new data in the same format as challenge data, you can use the instructions above to preprocess the data and run inference. For this purpose, simply ...
