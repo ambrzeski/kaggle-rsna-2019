@@ -75,8 +75,8 @@ In rsna19/data/csv directory you can find a set .csv dataset files defining trai
 * 5folds-test-rev3.csv - same as above, but labels for 196 are modified basing on our manual annotation of scans
 
 
-## Training models 1/2 (Dmytro's models)
 <a name="train-dmytro"></a>
+## Training models 1/2 (Dmytro's models)
 
 For training stage 1 models run the following commands for folds 0-4:
 
@@ -96,8 +96,8 @@ $ python models/clf2D/train.py train --model resnext50_400 --fold 0 --apex
 ```
 
 
-## Training models 2/2 (BrainScan models)
 <a name="train-brainscan"></a>
+## Training models 2/2 (BrainScan models)
 
 First you need to train baseline models that are used for initiating weights in final trainings. Trainings are conducted by running rsna19/models/clf2Dc/train.py script with appropriate config imported at the top of the file instead of the default place of ‘clf2Dc’. For example, to train train 'clf2Dc_resnet34_3c' config, change:
 
@@ -126,8 +126,8 @@ In stage 2 we trained to additional models (make sure to set 5fold-test.csv for 
 * clf2Dc_resnet34_3x3.py
 
 
-## Generating predictions for challenge data 1/2 (Dmytro's models)
 <a name="predict-dmytro"></a>
+## Generating predictions for challenge data 1/2 (Dmytro's models)
 
 Run the following set of commands for folds 0-4:
 
@@ -156,8 +156,8 @@ $ python models/clf2D/predict.py predict_test --model resnext50_400 --epoch 6 --
 
 ```
 
-## Generating predictions for challenge data 2/2 (BrainScan models)
 <a name="predict-brainscan"></a>
+## Generating predictions for challenge data 2/2 (BrainScan models)
 
 Calculate model predictions including TTAs by running: 
 
