@@ -37,7 +37,7 @@ def predict(model_name, fold, epoch, is_test, df_out_path, mode='normal', run=No
     preprocess_func.append(albumentations.pytorch.ToTensorV2())
 
     dataset_valid = dataset_3d_v2.IntracranialDataset(
-        csv_file='test.csv' if is_test else '5fold.csv',
+        csv_file='test2.csv' if is_test else '5fold.csv',
         folds=[fold],
         preprocess_func=albumentations.Compose(preprocess_func),
         return_labels=not is_test,
