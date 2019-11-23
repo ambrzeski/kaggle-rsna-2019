@@ -1,6 +1,12 @@
 # Kaggle RSNA 2019 - 8th place solution
 
-Solution overview: <kaggle-discussion-link>
+<a href="url">
+<img align="right" height="100" src="https://brainscan.ai/wp-content/uploads/2018/09/brainscan-logo.png">
+</a>
+
+Project is authored by [BrainScan.ai](https://brainscan.ai/) team (Adam Brzeski, Maciej Budyś, Tomasz Gilewicz, Szymon Papierowski) and [Dmytro Poplavskyi](https://www.kaggle.com/dmytropoplavskiy).
+
+Solution overview: [link]()
 
 Reproduction instructions:
 * [Data conversion](#data-conversion)
@@ -15,47 +21,46 @@ Reproduction instructions:
 
 ## Data conversion
 
-Project source is expected to operate on a converted form of challenge data, involving e.g. changing directory structure and image format. The new directory structure generated below will however create symlinks to the original data, so the original data should be kept in original location after completing data conversion process.
+Project source is expected to operate on a converted form of challenge data, involving e.g. changing directory structure and image format. The new directory structure generated according to instructions below will however create symlinks to the original data, so the original data should be kept in original location after completing data conversion process.
 
-First you need to download the Kaggle data, including: stage_1_train_images, stage_1_test_images, stage_2_test_images, stage_1_train.csv and stage_2_train.csv. After downloading the data, open project config file located at rsna19/config.py:
+1. Download the Kaggle data, including: stage_1_train_images, stage_1_test_images, stage_2_test_images, stage_1_train.csv and stage_2_train.csv. 
 
-
-```python
-class config:
-    train_dir = '/kolos/storage/ct/data/rsna/stage_1_train_images'
-    test_dir = '/kolos/storage/ct/data/rsna/stage_1_test_images'
-    labels_path = "/kolos/storage/ct/data/rsna/stage_1_train.csv"
-
-    data_root = "/kolos/m2/ct/data/rsna/"
+2. Open project config file located at rsna19/config.py:  
+    ```python
+    class config:
+        train_dir = '/kolos/storage/ct/data/rsna/stage_1_train_images'
+        test_dir = '/kolos/storage/ct/data/rsna/stage_1_test_images'
+        labels_path = "/kolos/storage/ct/data/rsna/stage_1_train.csv"
     
-    # Used for Dmytro's models
-    checkpoints_dir = "../output/checkpoints"
-    tensorboard_dir = "../output/tensorboard"
-    oof_dir = "../output/oof"
+        data_root = "/kolos/m2/ct/data/rsna/"
+        
+        # Used for Dmytro's models
+        checkpoints_dir = "../output/checkpoints"
+        tensorboard_dir = "../output/tensorboard"
+        oof_dir = "../output/oof"
+    
+        # Used for Brainscan models
+        model_outdir = '/kolos/m2/ct/models/classification/rsna/'
+    ```  
+    Modify train_dir, test_dir and labels_path variables to make them point to appropriate data paths on your hard drive. Also, modify the data_root variable to indicate output directory, where the converted data should be saved. Finally, set models output paths to desired locations, which will be used later during trainings.
 
-    # Used for Brainscan models
-    model_outdir = '/kolos/m2/ct/models/classification/rsna/'
-```
+3. Next, three scripts should be executed to perform the full process of conversion. The scripts can be run right away if you open the project in PyCharm. Otherwise you may need add project package to PYTHONPATH:
 
-Modify train_dir, test_dir and labels_path variables to make them point to appropriate data paths on your hard drive. Also, modify the data_root variable to indicate output directory, where the converted data should be saved. Finally, set models output paths to desired locations, which will be used later during trainings.
+    ```export PYTHONPATH="$PYTHONPATH:/{path}/{to}/kaggle-rsna-2019/rsna19/"```
 
-Next, three scripts should be executed to perform the full process of conversion. The scripts can be run right away if you open the project in PyCharm. Otherwise you may need add project package to PYTHONPATH:
+    Finally you can run the three scripts (please keep the order):
 
-```export PYTHONPATH="$PYTHONPATH:/{path}/{to}/kaggle-rsna-2019/rsna19/"```
-
-Finally you can run the three scripts (please keep the order):
-
-```
-# Generate data index and save it as .pkl
-$ python rsna19/data/scripts/create_dataframe.py   
-
-# Create new directory structure and symlinks to original dicoms
-$ python rsna19/data/scripts/create_symlinks.py
-
-# Convert dicom images (slices) to npy arrays and pngs images
-$ python rsna19/data/scripts/convert_dataset.py
-$ python rsna19/data/scripts/prepare_3d_data.py
-```
+    ```
+    # Generate data index and save it as .pkl
+    $ python rsna19/data/scripts/create_dataframe.py   
+    
+    # Create new directory structure and symlinks to original dicoms
+    $ python rsna19/data/scripts/create_symlinks.py
+    
+    # Convert dicom images (slices) to npy arrays and pngs images
+    $ python rsna19/data/scripts/convert_dataset.py
+    $ python rsna19/data/scripts/prepare_3d_data.py
+    ```
 
 As a result of the conversion, for each examination a set of subdirs will be created:
 
@@ -167,23 +172,35 @@ $ python rsna19/models/clf2Dc/predict.py
 
 ## Second level model and generating final predictions
 
-Make sure that all models are copied to common directory, so that the directory structure matches the following form: 
+1. Make sure that all models are copied to common directory, so that the directory structure matches the following form: 
 
-```
-{model_outdir}/{model_name}/{fold}/predictions/{predictions.csv}
-```
-Set path to this directory in rsna19/configs/base_config.Config.model_outdir. Next, generate the dataset for the second level model by running the following script for each of 5 folds (fold name can be specified in kaggle-rsna-2019/rsna19/configs/second_level.py):
+    ```
+    {model_outdir}/{model_name}/{fold}/predictions/{predictions.csv}
+    ```
+    Set path to this directory in rsna19/configs/base_config.Config.model_outdir.
 
-```
-$ python rsna19/models/second_level/dataset2.py
-```
+2. Generate the dataset for the second level model by running the following script for each of 5 folds (fold name can be specified in rsna19/configs/second_level.py):
+
+    ```
+    $ python rsna19/models/second_level/dataset2.py
+    ```
+
+3. In rsna19/configs/second_level.py:
+    * set models_root to path containing all trained models;
+    * set cache_dir to some path where data used by second level model will be saved.
+
+4. Run rsna19/models/second_level/dataset2.py for 5 folds (set appropriate fold in rsna19/configs/second_level.py).
+
+5. Run rsna19/models/second_level/second_level.ipynb notebook to train L2 model and save csv with predictions on test set.
+
+6. Run rsna19/data/generate_submission.py script to generate submission from the obtained csv.
 
 
 ## Testing on new data
 
-Unfortunately, as of now we don't provide a script to generate predictions on new data directly. However, if you can save the new data in the same format as challenge data, you can use the instructions above to preprocess the data and run inference.
+Unfortunately, as of now we don't provide a script to generate predictions on new data directly. However, if you can save the new data in the same format as challenge data, you can use the instructions above to preprocess the data and run the inference.
 
-Specifically, you need take the following steps:
+Specifically, you need to take the following steps:
 * set the path to the new test data directory in 'test_dir' in 'rsna19/config.py'
 * continue with data conversion steps
 * generate new test .csv file using rsna19/data/notebooks/generate_folds.ipynb notebook
