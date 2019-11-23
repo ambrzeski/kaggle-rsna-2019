@@ -30,7 +30,7 @@ def create_dataset(config, pred_type, stage):
 
     for model in config.models:
         tmp_dfs = []
-        for path in glob(str(config.models_root / model / config.fold / f"predictions_{stage}" / f"{pred_type}_*.csv")):
+        for path in glob(str(config.models_root / model / config.fold / f"predictions" / f"{pred_type}_*.csv")):
             print(path)
             tmp_dfs.append(pd.read_csv(path))
 
