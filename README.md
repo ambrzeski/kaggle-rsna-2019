@@ -204,5 +204,5 @@ Specifically, you need to take the following steps:
 * set the path to the new test data directory in 'test_dir' in 'rsna19/config.py'
 * continue with data conversion steps
 * generate new test .csv file using rsna19/data/notebooks/generate_folds.ipynb notebook
-* update test .csv path in appropriate prediction scripts first
+* update test .csv path in appropriate prediction scripts
 * run the predictions steps using the new test .csv file 
