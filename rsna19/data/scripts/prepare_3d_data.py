@@ -202,7 +202,9 @@ def process_scan(scan_dir):
 
 def main():
     with ProcessPoolExecutor(max_workers=16) as executor:
-        paths = glob(f'{BaseConfig.data_root}/train/*/dicom/') + glob(f'{BaseConfig.data_root}/test/*/dicom/')
+        paths = glob(f'{BaseConfig.data_root}/train/*/dicom/') + \
+                glob(f'{BaseConfig.data_root}/test/*/dicom/') + \
+                glob(f'{BaseConfig.data_root}/test2/*/dicom/')
         # paths = ['/kolos/m2/ct/data/rsna/train/ID_0dc7645c14/dicom/',
         #          '/kolos/m2/ct/data/rsna/train/ID_fcc85d6ebc/dicom/',
         #          '/kolos/m2/ct/data/rsna/test/ID_be88c23b42/dicom/',

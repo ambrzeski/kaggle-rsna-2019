@@ -3,6 +3,7 @@ class BaseConfig:
 
     train_dir = '/kolos/storage/ct/data/rsna/stage_1_train_images'
     test_dir = '/kolos/storage/ct/data/rsna/stage_1_test_images'
+    test2_dir = '/kolos/storage/ct/data/rsna/stage_2_test_images'
     labels_path = "/kolos/storage/ct/data/rsna/stage_1_train.csv"
     # train_dir = '/mnt/data_fast/RSNA_Intracranial_Hemorrhage_Detection/stage_2_train_images'
     # test_dir = '/mnt/data_fast/RSNA_Intracranial_Hemorrhage_Detection/stage_2_test_images'

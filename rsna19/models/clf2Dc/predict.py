@@ -18,9 +18,14 @@ from rsna19.data.dataset_2dc import IntracranialDataset
 from rsna19.models.clf2Dc.classifier2dc import Classifier2DC
 
 
+VAL_SET = '5fold.csv'
+TEST_SET = 'test2.csv'
+
+
 rot_params = {'interpolation': cv2.INTER_LINEAR, 'border_mode': cv2.BORDER_CONSTANT, 'value': 0, 'always_apply': True}
 
 TTA_TRANSFORMS_RESNET34_3x3 = {
+    # None: [albumentations.CenterCrop(384, 384)],
     'rcrop+rrot': [
         albumentations.Rotate((15, 15), **rot_params),
         albumentations.RandomCrop(384, 384)],
@@ -41,6 +46,7 @@ ssr_params = {'shift_limit': 0.1, 'scale_limit': 0.05, 'rotate_limit': 15, 'inte
               'border_mode': cv2.BORDER_CONSTANT, 'value': 0, 'p': 0.9}
 
 TTA_TRANSFORMS_RESNET50_7c_400 = {
+    # None:   None,
     'ssr_1': [albumentations.ShiftScaleRotate(**ssr_params)],
     'ssr_2': [albumentations.ShiftScaleRotate(**ssr_params)],
     'ssr+hflip_1': [albumentations.HorizontalFlip(True), albumentations.ShiftScaleRotate(**ssr_params)],
@@ -74,8 +80,8 @@ def predict(checkpoint_path, device, subset, tta_transforms, tta_variant=None):
             config_dict['append_masks'] = False
         if 'dataset_file' in config_dict:
             config_dict['train_dataset_file'] = config_dict['dataset_file']
-            config_dict['val_dataset_file'] = config_dict['dataset_file']
-            config_dict['test_dataset_file'] = 'test.csv'
+        config_dict['val_dataset_file'] = VAL_SET
+        config_dict['test_dataset_file'] = TEST_SET
         config = type('config', (), config_dict)
 
     with torch.cuda.device(device):
@@ -147,6 +153,8 @@ if __name__ == '__main__':
         (BaseConfig.model_outdir + '/0038_7s_res50_400', 'test', TTA_TRANSFORMS_RESNET50_7c_400),
         (BaseConfig.model_outdir + '/0036_3x3_pretrained', 'val', TTA_TRANSFORMS_RESNET34_3x3),
         (BaseConfig.model_outdir + '/0036_3x3_pretrained', 'test', TTA_TRANSFORMS_RESNET34_3x3),
+        (BaseConfig.model_outdir + '/0036_3x3_pretrained_stage2', 'val', TTA_TRANSFORMS_RESNET34_3x3),
+        (BaseConfig.model_outdir + '/0036_3x3_pretrained_stage2', 'test', TTA_TRANSFORMS_RESNET34_3x3),
         (BaseConfig.model_outdir + '/0036_3x3_5_slices_pretrained', 'val', TTA_TRANSFORMS_RESNET34_3x3),
         (BaseConfig.model_outdir + '/0036_3x3_5_slices_pretrained', 'test', TTA_TRANSFORMS_RESNET34_3x3)
     ]

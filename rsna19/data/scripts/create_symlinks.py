@@ -14,15 +14,18 @@ from tqdm import tqdm
 
 from rsna19.configs.base_config import BaseConfig
 
-# path under which new directory structure will be created
-DF_PATH_IN = os.path.join(BaseConfig.data_root, 'df.pkl')
+DF_PATHS_IN = [
+    os.path.join(BaseConfig.data_root, 'df.pkl'),
+    os.path.join(BaseConfig.data_root, 'df-stage2-test.pkl')]
 
 # dataframe mapping SOPInstanceUID of each dicom to path in new directory structure
-ID_DF_PATH_OUT = os.path.join(BaseConfig.data_root, 'id_to_path.pkl')
+ID_DF_PATHS_OUT = [
+    os.path.join(BaseConfig.data_root, 'id_to_path.pkl'),
+    os.path.join(BaseConfig.data_root, 'id_to_path_stage2-test.pkl')]
 
 
-def main():
-    with open(DF_PATH_IN, 'rb') as f:
+def main(df_path_in, id_df_path_out):
+    with open(df_path_in, 'rb') as f:
         df = pickle.load(f)
 
     id_to_path = defaultdict(list)
@@ -47,8 +50,9 @@ def main():
             id_to_path['path'].append(link_name)
 
     id_to_path = pandas.DataFrame(id_to_path)
-    id_to_path.to_pickle(ID_DF_PATH_OUT)
+    id_to_path.to_pickle(id_df_path_out)
 
 
 if __name__ == '__main__':
-    main()
+    for path_in, path_out in zip(DF_PATHS_IN, ID_DF_PATHS_OUT):
+        main(path_in, path_out)

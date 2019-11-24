@@ -7,9 +7,9 @@ from rsna19.configs.base_config import BaseConfig
 class Config(BaseConfig):
     train_out_dir = BaseConfig.model_outdir + '/0036_3x3_5_slices_pretrained'
 
-    train_dataset_file = '5fold.csv'
-    val_dataset_file = '5fold.csv'
-    test_dataset_file = 'test.csv'
+    train_dataset_file = '5fold-test.csv'
+    val_dataset_file = '5fold-test.csv'
+    test_dataset_file = 'test2.csv'
     data_version = '3d'  # '3d', 'npy', 'npy256' etc.
     use_cq500 = False
     val_folds = [0]
