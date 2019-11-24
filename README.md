@@ -6,7 +6,7 @@
 
 Project is authored by [BrainScan.ai](https://brainscan.ai/) team (Adam Brzeski, Maciej Budyś, Tomasz Gilewicz, Szymon Papierowski) and [Dmytro Poplavskyi](https://www.kaggle.com/dmytropoplavskiy).
 
-Solution overview: [link]()
+Solution overview: [link](https://www.kaggle.com/c/rsna-intracranial-hemorrhage-detection/discussion/118780)
 
 Reproduction instructions:
 * [Data conversion](#data-conversion)
