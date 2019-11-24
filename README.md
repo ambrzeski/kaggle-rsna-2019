@@ -1,7 +1,7 @@
 # Kaggle RSNA 2019 - 8th place solution
 
-<a href="url">
-<img align="right" height="100" src="https://brainscan.ai/wp-content/uploads/2018/09/brainscan-logo.png">
+<a href="https://brainscan.ai/">
+<img align="right" height="80" src="https://brainscan.ai/wp-content/uploads/2018/09/brainscan-logo.png">
 </a>
 
 Project is authored by [BrainScan.ai](https://brainscan.ai/) team (Adam Brzeski, Maciej Budyś, Tomasz Gilewicz, Szymon Papierowski) and [Dmytro Poplavskyi](https://www.kaggle.com/dmytropoplavskiy).
@@ -30,6 +30,7 @@ Project source is expected to operate on a converted form of challenge data, inv
     class config:
         train_dir = '/kolos/storage/ct/data/rsna/stage_1_train_images'
         test_dir = '/kolos/storage/ct/data/rsna/stage_1_test_images'
+        test2_dir = '/kolos/storage/ct/data/rsna/stage_2_test_images'
         labels_path = "/kolos/storage/ct/data/rsna/stage_1_train.csv"
     
         data_root = "/kolos/m2/ct/data/rsna/"
@@ -42,7 +43,7 @@ Project source is expected to operate on a converted form of challenge data, inv
         # Used for Brainscan models
         model_outdir = '/kolos/m2/ct/models/classification/rsna/'
     ```  
-    Modify train_dir, test_dir and labels_path variables to make them point to appropriate data paths on your hard drive. Also, modify the data_root variable to indicate output directory, where the converted data should be saved. Finally, set models output paths to desired locations, which will be used later during trainings.
+    Modify train_dir, test_dir, test2_dir and labels_path variables to make them point to appropriate data paths on your hard drive. Also, modify the data_root variable to indicate output directory, where the converted data should be saved. Finally, set models output paths to desired locations, which will be used later during trainings.
 
 3. Next, three scripts should be executed to perform the full process of conversion. The scripts can be run right away if you open the project in PyCharm. Otherwise you may need add project package to PYTHONPATH:
 
@@ -127,8 +128,8 @@ Then final models that we trained for stage 1 can be trained using configs:
 * clf2Dc_resnet50_7c_400.py
 
 In stage 2 we trained to additional models (make sure to set 5fold-test.csv for both 'train_dataset_file' and 'val_dataset_file' in config files):
+* clf2Dc_resnet34_3x3_2.py
 * clf2Dc_resnet34_3x3_5_slices.py
-* clf2Dc_resnet34_3x3.py
 
 
 <a name="predict-dmytro"></a>
@@ -203,6 +204,6 @@ Unfortunately, as of now we don't provide a script to generate predictions on ne
 Specifically, you need to take the following steps:
 * set the path to the new test data directory in 'test_dir' in 'rsna19/config.py'
 * continue with data conversion steps
-* generate new test .csv file using rsna19/data/notebooks/generate_folds.ipynb notebook
-* update test .csv path in appropriate prediction scripts
-* run the predictions steps using the new test .csv file 
+* generate new test csv file using rsna19/data/notebooks/generate_folds.ipynb notebook
+* update test csv file path in appropriate prediction scripts
+* run the predictions steps using the new test csv file 
