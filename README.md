@@ -4,7 +4,7 @@
 <img align="right" height="80" src="https://brainscan.ai/wp-content/uploads/2018/09/brainscan-logo.png">
 </a>
 
-Project is authored by [BrainScan.ai](https://brainscan.ai/) team (Adam Brzeski, Maciej Budyś, Tomasz Gilewicz, Szymon Papierowski) and [Dmytro Poplavskyi](https://www.kaggle.com/dmytropoplavskiy).
+Project is authored by [BrainScan.ai](https://brainscan.ai/) team (Adam Brzeski, Maciej Budyś, Tomasz Gilewicz, Szymon Papierowski) and [Dmytro Poplavskiy](https://www.kaggle.com/dmytropoplavskiy).
 
 Solution overview: [link](https://www.kaggle.com/c/rsna-intracranial-hemorrhage-detection/discussion/118780)
 
