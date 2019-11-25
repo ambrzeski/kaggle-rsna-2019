@@ -207,3 +207,35 @@ Specifically, you need to take the following steps:
 * generate new test csv file using rsna19/data/notebooks/generate_folds.ipynb notebook
 * update test csv file path in appropriate prediction scripts
 * run the predictions steps using the new test csv file 
+
+
+## Hardware & OS
+
+Server 1:
+* Intel Core  i7-6850K CPU @ 3.60GHz, 6 cores
+* 64 GB RAM
+* 4x Nvidia Titan Xp
+
+Server 2:
+* Intel Core  i7-6850K CPU @ 3.60GHz, 6 cores
+* 64 GB RAM
+* 4x Nvidia Titan X
+
+Server 3:
+* Intel Core i5-3570 CPU @ 3.40GHz, 4 cores
+* 32 GB RAM
+* 2x Nvidia Titan X
+
+Server 4:
+* 2x Xeon E5-2667 v2
+* 384 GB RAM
+* 4x 1080 Ti
+
+Server 5:
+* AMD TR 1950x
+* 128 GB RAM
+* 2x 2080 Ti, 1x 1080 Ti
+
+OS:
+* Brainscan.ai team: Ubuntu 16.04
+* Dmytro Poplavskiy: Ubuntu 18.04
