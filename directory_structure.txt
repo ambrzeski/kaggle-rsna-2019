@@ -1,0 +1,14 @@
+./rsna19
+./rsna19/configs                - Directory containing configuration files for our experiments (various architectures/approaches)
+./rsna19/models                 - Directory containing training pipelines for 2d/2dc/3d/seg approaches
+./rsna19/models/clf3D           - 3d classifier
+./rsna19/models/second_level    - Second level model
+./rsna19/models/clf2D           - 2d classifier
+./rsna19/models/commons         - Common components used in all training pipelines (metrics, optimizers, etc.)
+./rsna19/models/seg             - Segmentation model
+./rsna19/models/clf2Dc          - 2d classifier with consecutive slices in different input channels
+./rsna19/preprocessing          - Classes responsible for pre-processing of dicom files
+./rsna19/data                   - Directory containing 2d/3d/segmentation data loaders, data splits and scripts for data manipulating
+./rsna19/data/notebooks         - Jupyter notebooks used during prototyping/pre-processing
+./rsna19/data/csv               - Description of splits, lists of sample paths, metadata stored in csv format
+./rsna19/data/scripts           - One-time scripts for data pre-processing
